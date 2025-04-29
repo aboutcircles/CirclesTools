@@ -435,12 +435,12 @@
                     .map((addr) => addr.trim())
                     .filter((addr) => addr !== "");
                 
-                // Update URL hash for sharing (join with commas but no spaces)
+                // Update URL query parameter for sharing (join with commas but no spaces)
                 if (addresses.length > 0) {
                     // Update URL without page reload
-                    window.history.replaceState(null, null, `#${addresses.join(',')}`);
+                    window.history.replaceState(null, null, `?addresses=${addresses.join(',')}`);
                 } else {
-                    // Clear hash if no addresses
+                    // Clear query parameters if no addresses
                     window.history.replaceState(null, null, window.location.pathname);
                 }
                 
@@ -775,16 +775,17 @@
                 }
             });
 
-            // Initialize the input with addresses from URL hash or trusted groups on page load
+            // Initialize the input with addresses from URL query parameter or trusted groups on page load
             async function initializePage() {
-                // Check if there are addresses in the URL hash
-                if (window.location.hash) {
-                    // Remove the # character and use the addresses from the URL
-                    const hashAddresses = decodeURIComponent(window.location.hash.substring(1));
-                    if (hashAddresses) {
-                        groupInput.value = hashAddresses;
+                // Check if there are addresses in the URL query parameter
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.has('addresses')) {
+                    // Get the addresses from the URL query parameter
+                    const paramAddresses = decodeURIComponent(urlParams.get('addresses'));
+                    if (paramAddresses) {
+                        groupInput.value = paramAddresses;
                         // Automatically trigger the check with the addresses from the URL
-                        await checkGroups(hashAddresses);
+                        await checkGroups(paramAddresses);
                         return; // Exit early, no need to fetch trusted groups
                     }
                 }
