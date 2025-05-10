@@ -429,14 +429,23 @@
             const groupInput = document.getElementById("groupInput");
 
             async function checkGroups(input) {
-                // Clear previous results
-                resultDiv.innerHTML = "";
-
-                // Parse addresses (split by comma) and trim spaces
+                // Parse addresses and create a clean comma-separated string for the URL
                 const addresses = input
                     .split(",")
                     .map((addr) => addr.trim())
                     .filter((addr) => addr !== "");
+                
+                // Update URL query parameter for sharing (join with commas but no spaces)
+                if (addresses.length > 0) {
+                    // Update URL without page reload
+                    window.history.replaceState(null, null, `?addresses=${addresses.join(',')}`);
+                } else {
+                    // Clear query parameters if no addresses
+                    window.history.replaceState(null, null, window.location.pathname);
+                }
+                
+                // Clear previous results
+                resultDiv.innerHTML = "";
 
                 // Validate each address
                 for (let addr of addresses) {
@@ -766,8 +775,22 @@
                 }
             });
 
-            // Initialize the input with trusted groups on page load
+            // Initialize the input with addresses from URL query parameter or trusted groups on page load
             async function initializePage() {
+                // Check if there are addresses in the URL query parameter
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.has('addresses')) {
+                    // Get the addresses from the URL query parameter
+                    const paramAddresses = decodeURIComponent(urlParams.get('addresses'));
+                    if (paramAddresses) {
+                        groupInput.value = paramAddresses;
+                        // Automatically trigger the check with the addresses from the URL
+                        await checkGroups(paramAddresses);
+                        return; // Exit early, no need to fetch trusted groups
+                    }
+                }
+                
+                // If no addresses in URL hash, fall back to trusted groups
                 // this is the address of the metri truster org
                 const trusterAddress =
                     "0x0afd8899bca011bb95611409f09c8efbf6b169cf";
