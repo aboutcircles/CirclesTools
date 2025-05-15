@@ -340,6 +340,37 @@
                 }
             }
 
+            // --- getTrustRelations ---
+            async function getTrustRelations(address) {
+                if (!address || address === ethers.constants.AddressZero) return { trusts: [], trustedBy: [] };
+                try {
+                    const response = await fetch("https://rpc.aboutcircles.com/", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            jsonrpc: "2.0",
+                            method: "circles_getTrustRelations",
+                            params: [address],
+                            id: 1
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        console.warn("Trust relations API returned non-OK status:", response.status);
+                        return { trusts: [], trustedBy: [] };
+                    }
+                    
+                    const data = await response.json();
+                    return {
+                        trusts: data.result?.trusts || [],
+                        trustedBy: data.result?.trustedBy || []
+                    };
+                } catch (err) {
+                    console.warn("Error fetching trust relations for", address, err);
+                    return { trusts: [], trustedBy: [] };
+                }
+            }
+
             /********************************************************
              *  Utility functions
              ********************************************************/
@@ -390,14 +421,41 @@
                 resultDiv.appendChild(loader);
 
                 try {
-                    // 1) Get core data from helper contract
-                    const data = await helperContract.getAllDataForUser(inputAddress);
+                    // 1) Get core data from helper contract and trust relations from RPC
+                    const [data, trustRelations] = await Promise.all([
+                        helperContract.getAllDataForUser(inputAddress),
+                        getTrustRelations(inputAddress)
+                    ]);
+                    
                     const v1Data = data.v1Data;
                     const v2Data = data.v2Data;
                     const trustedAddressesData = data.trustedAddresses;
+                    
+                    // Combine trust relations from both sources
+                    const trustedAddresses = new Set();
+                    
+                    // Add addresses from helper contract
+                    trustedAddressesData.forEach(t => {
+                        trustedAddresses.add(t.trustedAddress.toLowerCase());
+                    });
+                    
+                    // Add addresses from RPC call
+                    trustRelations.trusts.forEach(t => {
+                        trustedAddresses.add(t.user.toLowerCase());
+                    });
+                    
+                    trustRelations.trustedBy.forEach(t => {
+                        trustedAddresses.add(t.user.toLowerCase());
+                    });
+                    
+                    // Remove self-trust if present
+                    trustedAddresses.delete(inputAddress.toLowerCase());
+                    
+                    // Convert to array
+                    const allTrustedAddresses = Array.from(trustedAddresses);
 
                     // 2) Get ERC20 tokens for all relevant addresses
-                    const addressesForErc20 = [inputAddress, ...trustedAddressesData.map(t => t.trustedAddress)];
+                    const addressesForErc20 = [inputAddress, ...allTrustedAddresses];
                     const erc20Array = await avatarERC20Contract.getAvatarsERC20(addressesForErc20);
                     const erc20Map = {};
                     addressesForErc20.forEach((addr, idx) => {
@@ -429,7 +487,37 @@
                         summaryHtml += `<div class="info"><strong>[V2] Total Supply:</strong> ${ethers.utils.formatUnits(v2Data.totalSupply, 18)}</div>`;
                     }
                     summaryHtml += `<div class="info"><strong>ERC20 (static):</strong> ${mainERC20 && mainERC20 !== ethers.constants.AddressZero ? mainERC20 : 'N/A'}</div>`;
+<<<<<<< Updated upstream
                     summaryHtml += `<div class="info"><strong>[V2] Trusted Connections Count:</strong> ${trustedAddressesData.length}</div>`;
+=======
+                    
+                    // Create a map of trust data from helper contract
+                    const trustDataMap = {};
+                    trustedAddressesData.forEach(trust => {
+                        trustDataMap[trust.trustedAddress.toLowerCase()] = trust;
+                    });
+                    
+                    // Create a map of trust relationships from RPC
+                    const trustRelationsMap = {};
+                    trustRelations.trusts.forEach(t => {
+                        trustRelationsMap[t.user.toLowerCase()] = { 
+                            outgoing: true
+                        };
+                    });
+                    
+                    trustRelations.trustedBy.forEach(t => {
+                        const addr = t.user.toLowerCase();
+                        if (trustRelationsMap[addr]) {
+                            trustRelationsMap[addr].incoming = true;
+                        } else {
+                            trustRelationsMap[addr] = { 
+                                incoming: true
+                            };
+                        }
+                    });
+
+                    summaryHtml += `<div class="info"><strong>[V2] Trusted Connections Count:</strong> ${allTrustedAddresses.length}</div>`;
+>>>>>>> Stashed changes
                     resultDiv.innerHTML = summaryHtml;
 
                     // Async update main user name and price
@@ -437,11 +525,15 @@
                     getPrice(mainERC20).then(price => { document.getElementById('main-user-price').textContent = price; });
 
                     // 5) Display trusted addresses table
+<<<<<<< Updated upstream
                     if (trustedAddressesData.length > 0) {
+=======
+                    if (allTrustedAddresses.length > 0) {
+>>>>>>> Stashed changes
                         const table = document.createElement("table");
                         const thead = document.createElement("thead");
                         const headerRow = document.createElement("tr");
-                        const headers = ['Trusted Address', 'Price', 'Expiry', 'V1 State', 'V2 State', 'V2 Supply', 'User Holds', 'Bot Status', 'ERC20 (static)'];
+                        const headers = ['Trusted Address', 'Trust Direction', 'Price', 'Expiry', 'V1 State', 'V2 State', 'V2 Supply', 'User Holds', 'Bot Status', 'ERC20 (static)'];
                         headers.forEach(headerText => {
                             const th = document.createElement("th");
                             th.textContent = headerText;
@@ -451,10 +543,15 @@
                         table.appendChild(thead);
 
                         const tbody = document.createElement("tbody");
+<<<<<<< Updated upstream
                         for (let i = 0; i < trustedAddressesData.length; i++) {
                             const addrData = trustedAddressesData[i];
+=======
+                        for (let i = 0; i < allTrustedAddresses.length; i++) {
+                            const trustedAddr = allTrustedAddresses[i];
+>>>>>>> Stashed changes
                             const row = document.createElement("tr");
-                            const trustedAddr = addrData.trustedAddress;
+                            const addrData = trustDataMap[trustedAddr.toLowerCase()] || {};
                             const trustedErc20 = erc20Map[trustedAddr.toLowerCase()]?.demurragedERC20;
 
                             // Trusted Address Cell (Name + Address + Copy/Link)
@@ -505,28 +602,91 @@
                             // Async update name
                             getProfileName(trustedAddr).then(name => { nameSpan.textContent = name; });
 
+                            // Trust Direction Cell
+                            const trustDirectionCell = document.createElement("td");
+                            const trustInfo = trustRelationsMap[trustedAddr.toLowerCase()] || {};
+                            let directionText = '';
+                            
+                            // Check if this address is in the helper contract data
+                            const isInHelperData = trustedAddressesData.some(t => 
+                                t.trustedAddress.toLowerCase() === trustedAddr.toLowerCase()
+                            );
+                            
+                            // Check if this address is in the RPC data
+                            const isInRpcTrusts = trustRelations.trusts.some(t => 
+                                t.user.toLowerCase() === trustedAddr.toLowerCase()
+                            );
+                            const isInRpcTrustedBy = trustRelations.trustedBy.some(t => 
+                                t.user.toLowerCase() === trustedAddr.toLowerCase()
+                            );
+                            
+                            if (trustInfo.outgoing && trustInfo.incoming) {
+                                directionText = `Mutual`;
+                                trustDirectionCell.title = "Mutual trust: both directions";
+                            } else if (trustInfo.outgoing) {
+                                directionText = `Outgoing`;
+                                trustDirectionCell.title = "Outgoing trust: you trust them";
+                            } else if (trustInfo.incoming) {
+                                directionText = `Incoming`;
+                                trustDirectionCell.title = "Incoming trust: they trust you";
+                            } else if (isInHelperData && !isInRpcTrusts && !isInRpcTrustedBy) {
+                                // If the address is in helper data but not in RPC data
+                                directionText = 'Unknown';
+                                trustDirectionCell.title = "Unknown trust direction";
+                            } else {
+                                directionText = 'Unknown';
+                                trustDirectionCell.title = "Unknown trust direction";
+                            }
+                            
+                            trustDirectionCell.textContent = directionText;
+                            row.appendChild(trustDirectionCell);
+                            
                             // Price Cell (updated async)
                             const priceCell = document.createElement("td");
                             priceCell.textContent = 'Loading...';
                             row.appendChild(priceCell);
                             getPrice(trustedErc20).then(price => { priceCell.textContent = price; });
+<<<<<<< Updated upstream
 
                             // Expiry (use expiry from next row, or N/A for last row)
                             let expiryValue;
                             if (i < trustedAddressesData.length - 1) {
                                 expiryValue = trustedAddressesData[i + 1].expiry;
+=======
+                            
+                            // Expiry
+                            const expiryCell = document.createElement("td");
+                            if (addrData.expiry) {
+                                expiryCell.textContent = formatExpiry(addrData.expiry);
+>>>>>>> Stashed changes
                             } else {
-                                expiryValue = 0; // Last row gets N/A
+                                expiryCell.textContent = 'N/A';
                             }
-                            row.appendChild(document.createElement("td")).textContent = expiryValue === 0 ? 'N/A' : formatExpiry(expiryValue);
+                            row.appendChild(expiryCell);
+                            
                             // V1 State
                             row.appendChild(document.createElement("td")).textContent = addrData.v1Human ? 'human' : (addrData.v1Org ? 'org' : 'none');
+                            
                             // V2 State
                             row.appendChild(document.createElement("td")).textContent = addrData.v2Human ? 'human' : (addrData.v2Org ? 'org' : (addrData.v2Group ? 'group' : 'none'));
+                            
                             // V2 Total Supply
-                            row.appendChild(document.createElement("td")).textContent = addrData.v2TotalSupply.eq(0) ? '-' : ethers.utils.formatUnits(addrData.v2TotalSupply, 18);
+                            const v2SupplyCell = document.createElement("td");
+                            if (addrData.v2TotalSupply) {
+                                v2SupplyCell.textContent = addrData.v2TotalSupply.eq(0) ? '-' : ethers.utils.formatUnits(addrData.v2TotalSupply, 18);
+                            } else {
+                                v2SupplyCell.textContent = '-';
+                            }
+                            row.appendChild(v2SupplyCell);
+                            
                             // User Holds
-                            row.appendChild(document.createElement("td")).textContent = ethers.utils.formatUnits(addrData.userHolds, 18);
+                            const userHoldsCell = document.createElement("td");
+                            if (addrData.userHolds) {
+                                userHoldsCell.textContent = ethers.utils.formatUnits(addrData.userHolds, 18);
+                            } else {
+                                userHoldsCell.textContent = '-';
+                            }
+                            row.appendChild(userHoldsCell);
 
                             // Bot Status Cell (updated async)
                             const botCell = document.createElement("td");
