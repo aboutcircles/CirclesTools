@@ -487,9 +487,6 @@
                         summaryHtml += `<div class="info"><strong>[V2] Total Supply:</strong> ${ethers.utils.formatUnits(v2Data.totalSupply, 18)}</div>`;
                     }
                     summaryHtml += `<div class="info"><strong>ERC20 (static):</strong> ${mainERC20 && mainERC20 !== ethers.constants.AddressZero ? mainERC20 : 'N/A'}</div>`;
-<<<<<<< Updated upstream
-                    summaryHtml += `<div class="info"><strong>[V2] Trusted Connections Count:</strong> ${trustedAddressesData.length}</div>`;
-=======
                     
                     // Create a map of trust data from helper contract
                     const trustDataMap = {};
@@ -517,7 +514,6 @@
                     });
 
                     summaryHtml += `<div class="info"><strong>[V2] Trusted Connections Count:</strong> ${allTrustedAddresses.length}</div>`;
->>>>>>> Stashed changes
                     resultDiv.innerHTML = summaryHtml;
 
                     // Async update main user name and price
@@ -525,11 +521,7 @@
                     getPrice(mainERC20).then(price => { document.getElementById('main-user-price').textContent = price; });
 
                     // 5) Display trusted addresses table
-<<<<<<< Updated upstream
-                    if (trustedAddressesData.length > 0) {
-=======
                     if (allTrustedAddresses.length > 0) {
->>>>>>> Stashed changes
                         const table = document.createElement("table");
                         const thead = document.createElement("thead");
                         const headerRow = document.createElement("tr");
@@ -543,13 +535,8 @@
                         table.appendChild(thead);
 
                         const tbody = document.createElement("tbody");
-<<<<<<< Updated upstream
-                        for (let i = 0; i < trustedAddressesData.length; i++) {
-                            const addrData = trustedAddressesData[i];
-=======
                         for (let i = 0; i < allTrustedAddresses.length; i++) {
                             const trustedAddr = allTrustedAddresses[i];
->>>>>>> Stashed changes
                             const row = document.createElement("tr");
                             const addrData = trustDataMap[trustedAddr.toLowerCase()] || {};
                             const trustedErc20 = erc20Map[trustedAddr.toLowerCase()]?.demurragedERC20;
@@ -646,19 +633,11 @@
                             priceCell.textContent = 'Loading...';
                             row.appendChild(priceCell);
                             getPrice(trustedErc20).then(price => { priceCell.textContent = price; });
-<<<<<<< Updated upstream
-
-                            // Expiry (use expiry from next row, or N/A for last row)
-                            let expiryValue;
-                            if (i < trustedAddressesData.length - 1) {
-                                expiryValue = trustedAddressesData[i + 1].expiry;
-=======
                             
                             // Expiry
                             const expiryCell = document.createElement("td");
                             if (addrData.expiry) {
                                 expiryCell.textContent = formatExpiry(addrData.expiry);
->>>>>>> Stashed changes
                             } else {
                                 expiryCell.textContent = 'N/A';
                             }
