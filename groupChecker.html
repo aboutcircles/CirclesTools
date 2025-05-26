@@ -220,7 +220,10 @@
                 try {
                     console.log("Fetching profile for address:", address);
                     const queryAddress = address.toLowerCase();
+                    // Circles RPC
                     const url = `https://rpc.aboutcircles.com/profiles/search?address=${queryAddress}`;
+                    // RINGS RPC
+                    // const url = `https://static.94.138.251.148.clients.your-server.de/profiles/search?address=${queryAddress}`;
                     console.log("Request URL:", url);
                     const response = await fetch(url);
                     if (!response.ok) {
