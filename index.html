@@ -1,204 +1,247 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Circles Tools</title>
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap"
-      rel="stylesheet"
-    />
-    <link 
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" 
-      rel="stylesheet"
-    />
-    <style>
-      body {
-        margin: 0;
-        font-family: "Inter", Helvetica, Arial, sans-serif;
-        background: #f8f9fa;
-        color: #333;
-        line-height: 1.6;
-      }
-      header {
-        background: #5c49e4;
-        color: #fff;
-        padding: 20px;
-        text-align: center;
-      }
-      h1 {
-        margin: 0;
-        font-weight: 600;
-        font-size: 1.5rem;
-      }
-      p {
-        margin: 0.5rem 0 0;
-        font-weight: 400;
-      }
-      .container {
-        max-width: 1200px;
-        margin: 40px auto;
-        padding: 0 20px;
-      }
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Circles Tools</title>
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap"
+            rel="stylesheet"
+        />
+        <link
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+            rel="stylesheet"
+        />
+        <style>
+            body {
+                margin: 0;
+                font-family: "Inter", Helvetica, Arial, sans-serif;
+                background: #f8f9fa;
+                color: #333;
+                line-height: 1.6;
+            }
+            header {
+                background: #5c49e4;
+                color: #fff;
+                padding: 20px;
+                text-align: center;
+            }
+            h1 {
+                margin: 0;
+                font-weight: 600;
+                font-size: 1.5rem;
+            }
+            p {
+                margin: 0.5rem 0 0;
+                font-weight: 400;
+            }
+            .container {
+                max-width: 1200px;
+                margin: 40px auto;
+                padding: 0 20px;
+            }
 
-      .tools-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 15px;
-        margin-top: 20px;
-        margin-bottom: 15px;
-      }
+            .tools-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                gap: 15px;
+                margin-top: 20px;
+                margin-bottom: 15px;
+            }
 
-      .tool-card {
-        background: white;
-        border-radius: 8px;
-        padding: 15px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        transition: transform 0.2s, box-shadow 0.2s;
-        display: flex;
-        flex-direction: column;
-      }
+            .tool-card {
+                background: white;
+                border-radius: 8px;
+                padding: 15px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                transition:
+                    transform 0.2s,
+                    box-shadow 0.2s;
+                display: flex;
+                flex-direction: column;
+            }
 
-      .tool-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
-      }
+            .tool-card:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+            }
 
-      .tool-icon {
-        font-size: 2rem;
-        color: #5c49e4;
-        margin-bottom: 15px;
-      }
+            .tool-icon {
+                font-size: 2rem;
+                color: #5c49e4;
+                margin-bottom: 15px;
+            }
 
-      .tool-title {
-        font-size: 1.2rem;
-        font-weight: 600;
-        margin: 0 0 10px;
-        color: #333;
-      }
+            .tool-title {
+                font-size: 1.2rem;
+                font-weight: 600;
+                margin: 0 0 10px;
+                color: #333;
+            }
 
-      .tool-desc {
-        font-size: 0.95rem;
-        color: #666;
-        margin-bottom: 15px;
-      }
+            .tool-desc {
+                font-size: 0.95rem;
+                color: #666;
+                margin-bottom: 15px;
+            }
 
-      .tool-link {
-        display: inline-block;
-        background: #5c49e4;
-        color: white;
-        padding: 8px 16px;
-        border-radius: 4px;
-        text-decoration: none;
-        font-weight: 500;
-        transition: background 0.2s;
-        margin-top: auto;
-        align-self: flex-start;
-      }
+            .tool-link {
+                display: inline-block;
+                background: #5c49e4;
+                color: white;
+                padding: 8px 16px;
+                border-radius: 4px;
+                text-decoration: none;
+                font-weight: 500;
+                transition: background 0.2s;
+                margin-top: auto;
+                align-self: flex-start;
+            }
 
-      .tool-link:hover {
-        background: #4a38c2;
-      }
+            .tool-link:hover {
+                background: #4a38c2;
+            }
 
-      @media (max-width: 768px) {
-        .tools-grid {
-          grid-template-columns: 1fr;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <header>
-      <h1>Circles Tools</h1>
-      <p>Essential tools for the Circles ecosystem</p>
-    </header>
+            @media (max-width: 768px) {
+                .tools-grid {
+                    grid-template-columns: 1fr;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <h1>Circles Tools</h1>
+            <p>Essential tools for the Circles ecosystem</p>
+        </header>
 
-    <div class="container">
-      <div class="tools-grid">
-        <div class="tool-card">
-          <div class="tool-icon"><i class="fas fa-users"></i></div>
-          <h3 class="tool-title">Group Checker</h3>
-          <p class="tool-desc">Check group membership and token balances</p>
-          <a href="groupChecker.html" class="tool-link">Open Tool</a>
+        <div class="container">
+            <div class="tools-grid">
+                <div class="tool-card">
+                    <div class="tool-icon"><i class="fas fa-users"></i></div>
+                    <h3 class="tool-title">Group Checker</h3>
+                    <p class="tool-desc">
+                        Check group membership and token balances
+                    </p>
+                    <a href="groupChecker.html" class="tool-link">Open Tool</a>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-icon">
+                        <i class="fas fa-plus-circle"></i>
+                    </div>
+                    <h3 class="tool-title">Group Creator</h3>
+                    <p class="tool-desc">Create new Circles groups</p>
+                    <a href="groupcreator.html" class="tool-link">Open Tool</a>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-icon"><i class="fas fa-cog"></i></div>
+                    <h3 class="tool-title">Group Management</h3>
+                    <p class="tool-desc">Manage existing groups and members</p>
+                    <a href="groupmanagement.html" class="tool-link"
+                        >Open Tool</a
+                    >
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-icon"><i class="fas fa-user"></i></div>
+                    <h3 class="tool-title">Profile Checker</h3>
+                    <p class="tool-desc">View Circles profile information</p>
+                    <a href="profileChecker.html" class="tool-link"
+                        >Open Tool</a
+                    >
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-icon"><i class="fas fa-wallet"></i></div>
+                    <h3 class="tool-title">Safe Viewer</h3>
+                    <p class="tool-desc">
+                        View Circles Safe details and balances
+                    </p>
+                    <a href="SafeViewer.html" class="tool-link">Open Tool</a>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-icon">
+                        <i class="fas fa-project-diagram"></i>
+                    </div>
+                    <h3 class="tool-title">Trust Visualization</h3>
+                    <p class="tool-desc">Visualize trust relationships</p>
+                    <a href="trustViz.html" class="tool-link">Open Tool</a>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-icon"><i class="fas fa-route"></i></div>
+                    <h3 class="tool-title">Trust Path Visualization</h3>
+                    <p class="tool-desc">Explore trust paths between users</p>
+                    <a href="trustPathViz.html" class="tool-link">Open Tool</a>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-icon"><i class="fas fa-coins"></i></div>
+                    <h3 class="tool-title">Personal CRC Replenisher</h3>
+                    <p class="tool-desc">Get CRC tokens for personal use</p>
+                    <a href="replenishMyCRC.html" class="tool-link"
+                        >Open Tool</a
+                    >
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-icon">
+                        <i class="fas fa-exchange-alt"></i>
+                    </div>
+                    <h3 class="tool-title">Circles Backing Dapp</h3>
+                    <p class="tool-desc">Manage token backing and exchange</p>
+                    <a href="backingFactoryDapp.html" class="tool-link"
+                        >Open Tool</a
+                    >
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h3 class="tool-title">LBP Starter</h3>
+                    <p class="tool-desc">
+                        Launch liquidity bootstrapping pools
+                    </p>
+                    <a href="lbpStarter.html" class="tool-link">Open Tool</a>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-icon">
+                        <i class="fas fa-chart-pie"></i>
+                    </div>
+                    <h3 class="tool-title">Token Distribution Checker</h3>
+                    <p class="tool-desc">Analyze token distribution</p>
+                    <a href="tokenDistributionChecker.html" class="tool-link"
+                        >Open Tool</a
+                    >
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-icon"><i class="fas fa-history"></i></div>
+                    <h3 class="tool-title">Legacy Circles Safe Creator</h3>
+                    <p class="tool-desc">Create legacy Circles Safes</p>
+                    <a href="createLegacyCirclesSafe.html" class="tool-link"
+                        >Open Tool</a
+                    >
+                </div>
+            </div>
+            <div class="tool-card">
+                <div class="tool-icon"><i class="fas fa-user-plus"></i></div>
+                <h3 class="tool-title">Onboarding Helper</h3>
+                <p class="tool-desc">
+                    Easily invite users and add them to groups
+                </p>
+                <a
+                    href="https://pboes.github.io/metri-inviter-team/"
+                    class="tool-link"
+                    target="_blank"
+                    >Open Tool</a
+                >
+            </div>
         </div>
-
-        <div class="tool-card">
-          <div class="tool-icon"><i class="fas fa-plus-circle"></i></div>
-          <h3 class="tool-title">Group Creator</h3>
-          <p class="tool-desc">Create new Circles groups</p>
-          <a href="groupcreator.html" class="tool-link">Open Tool</a>
-        </div>
-
-        <div class="tool-card">
-          <div class="tool-icon"><i class="fas fa-cog"></i></div>
-          <h3 class="tool-title">Group Management</h3>
-          <p class="tool-desc">Manage existing groups and members</p>
-          <a href="groupmanagement.html" class="tool-link">Open Tool</a>
-        </div>
-
-        <div class="tool-card">
-          <div class="tool-icon"><i class="fas fa-user"></i></div>
-          <h3 class="tool-title">Profile Checker</h3>
-          <p class="tool-desc">View Circles profile information</p>
-          <a href="profileChecker.html" class="tool-link">Open Tool</a>
-        </div>
-
-        <div class="tool-card">
-          <div class="tool-icon"><i class="fas fa-wallet"></i></div>
-          <h3 class="tool-title">Safe Viewer</h3>
-          <p class="tool-desc">View Circles Safe details and balances</p>
-          <a href="SafeViewer.html" class="tool-link">Open Tool</a>
-        </div>
-
-        <div class="tool-card">
-          <div class="tool-icon"><i class="fas fa-project-diagram"></i></div>
-          <h3 class="tool-title">Trust Visualization</h3>
-          <p class="tool-desc">Visualize trust relationships</p>
-          <a href="trustViz.html" class="tool-link">Open Tool</a>
-        </div>
-
-        <div class="tool-card">
-          <div class="tool-icon"><i class="fas fa-route"></i></div>
-          <h3 class="tool-title">Trust Path Visualization</h3>
-          <p class="tool-desc">Explore trust paths between users</p>
-          <a href="trustPathViz.html" class="tool-link">Open Tool</a>
-        </div>
-
-        <div class="tool-card">
-          <div class="tool-icon"><i class="fas fa-coins"></i></div>
-          <h3 class="tool-title">Personal CRC Replenisher</h3>
-          <p class="tool-desc">Get CRC tokens for personal use</p>
-          <a href="replenishMyCRC.html" class="tool-link">Open Tool</a>
-        </div>
-
-        <div class="tool-card">
-          <div class="tool-icon"><i class="fas fa-exchange-alt"></i></div>
-          <h3 class="tool-title">Circles Backing Dapp</h3>
-          <p class="tool-desc">Manage token backing and exchange</p>
-          <a href="backingFactoryDapp.html" class="tool-link">Open Tool</a>
-        </div>
-
-        <div class="tool-card">
-          <div class="tool-icon"><i class="fas fa-chart-line"></i></div>
-          <h3 class="tool-title">LBP Starter</h3>
-          <p class="tool-desc">Launch liquidity bootstrapping pools</p>
-          <a href="lbpStarter.html" class="tool-link">Open Tool</a>
-        </div>
-
-        <div class="tool-card">
-          <div class="tool-icon"><i class="fas fa-chart-pie"></i></div>
-          <h3 class="tool-title">Token Distribution Checker</h3>
-          <p class="tool-desc">Analyze token distribution</p>
-          <a href="tokenDistributionChecker.html" class="tool-link">Open Tool</a>
-        </div>
-
-        <div class="tool-card">
-          <div class="tool-icon"><i class="fas fa-history"></i></div>
-          <h3 class="tool-title">Legacy Circles Safe Creator</h3>
-          <p class="tool-desc">Create legacy Circles Safes</p>
-          <a href="createLegacyCirclesSafe.html" class="tool-link">Open Tool</a>
-        </div>
-      </div>
-    </div>
-  </body>
+    </body>
 </html>
