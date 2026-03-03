@@ -158,15 +158,19 @@
 </head>
 <body>
   <div class="container">
-    <img src="https://pbs.twimg.com/profile_images/1760246121622904832/eXk9UQke_400x400.jpg" class="logo" alt="Circles Logo" />
+    <img src="https://i.imgur.com/UaqSXxq.jpeg" class="logo" alt="Circles Logo" />
     <h1>Join a Circles Lottery</h1>
     <div class="subtitle">Try your luck and win prizes with Circles!</div>
     <div id="error" class="error" style="display:none;"></div>
     <div id="success" class="success" style="display:none;"></div>
     <div id="advancedSection" style="display:none;margin-bottom:12px;">
       <div class="input-group" style="margin-bottom:8px;">
-        <label for="lotterySelect" style="font-size:0.95em;">Select Lottery</label>
-        <select id="lotterySelect" style="padding:4px 8px;border-radius:6px;border:1px solid #d0d7de;background:#f7fafc;font-size:0.98em;width:100%;margin-bottom:8px;"></select>
+        <label for="activeLotterySelect" style="font-weight:600;font-size:1.1em;">Active Lotteries</label>
+        <select id="activeLotterySelect" style="padding:4px 8px;border-radius:6px;border:1px solid #d0d7de;background:#f7fafc;font-size:0.98em;width:100%;margin-bottom:8px;"></select>
+      </div>
+      <div class="input-group" style="margin-bottom:8px;">
+        <label for="otherLotterySelect" style="font-weight:600;font-size:1.1em;">Past Lotteries</label>
+        <select id="otherLotterySelect" style="padding:4px 8px;border-radius:6px;border:1px solid #d0d7de;background:#f7fafc;font-size:0.98em;width:100%;margin-bottom:8px;"></select>
       </div>
       <div class="input-group" style="margin-bottom:8px;">
         <label for="lotteryAddress" style="font-size:0.95em;">Or Enter Lottery Address</label>
@@ -281,31 +285,55 @@
     async function loadLotteriesList() {
       try {
         allLotteries = await factory.allDeployments();
-        const select = document.getElementById('lotterySelect');
-        select.innerHTML = '';
-        for (let i = allLotteries.length - 1; i >= 0; i--) {
-          const addr = allLotteries[i];
+        const activeLotterySelect = document.getElementById('activeLotterySelect');
+        const otherLotterySelect = document.getElementById('otherLotterySelect');
+        const now = Math.floor(Date.now() / 1000);
+        const activeOptions = [];
+        const otherOptions = [];
+        await Promise.all(allLotteries.map(async (addr) => {
           let name = addr;
           try {
             const l = new ethers.Contract(addr, LOTTERY_ABI, provider);
             name = await l.lotteryName();
+            const [isDrawn, isCancelled, endTime] = await Promise.all([
+              l.isDrawn(),
+              l.isCancelled(),
+              l.endTime()
+            ]);
+            const option = document.createElement('option');
+            option.value = addr;
+            option.textContent = `${name} (${addr.slice(0, 6)}...${addr.slice(-4)})`;
+            if (!isDrawn && !isCancelled && endTime.toNumber() > now) {
+              activeOptions.push(option);
+            } else {
+              otherOptions.push(option);
+            }
           } catch {}
-          const option = document.createElement('option');
-          option.value = addr;
-          option.textContent = `${name} (${addr.slice(0, 6)}...${addr.slice(-4)})`;
-          select.appendChild(option);
-        }
+        }));
+        activeOptions.sort((a, b) => a.textContent.localeCompare(b.textContent));
+        otherOptions.sort((a, b) => a.textContent.localeCompare(b.textContent));
+        activeLotterySelect.innerHTML = '';
+        otherLotterySelect.innerHTML = '';
+        activeOptions.forEach(opt => activeLotterySelect.appendChild(opt));
+        otherOptions.forEach(opt => otherLotterySelect.appendChild(opt));
         // By default, select the latest
         if (allLotteries.length > 0) {
-          select.value = allLotteries[allLotteries.length - 1];
-          setLotteryAddress(select.value);
+          activeLotterySelect.value = allLotteries[allLotteries.length - 1];
+          otherLotterySelect.value = allLotteries[allLotteries.length - 1];
+          setLotteryAddress(activeLotterySelect.value);
+          setLotteryAddress(otherLotterySelect.value);
         }
       } catch (e) {
         showError('Could not load lotteries from factory.');
       }
     }
 
-    document.getElementById('lotterySelect').addEventListener('change', function() {
+    document.getElementById('activeLotterySelect').addEventListener('change', function() {
+      setLotteryAddress(this.value);
+      loadLotteryByAddress(this.value);
+    });
+
+    document.getElementById('otherLotterySelect').addEventListener('change', function() {
       setLotteryAddress(this.value);
       loadLotteryByAddress(this.value);
     });
@@ -368,7 +396,7 @@
     // --- On page load: load lotteries and show latest ---
     window.addEventListener('DOMContentLoaded', async () => {
       await loadLotteriesList();
-      const select = document.getElementById('lotterySelect');
+      const select = document.getElementById('activeLotterySelect');
       const addr = getParam('address');
       if (addr && /^0x[a-fA-F0-9]{40}$/.test(addr)) {
         setLotteryAddress(addr);
@@ -592,12 +620,12 @@
       }
       // Engaging call-to-action
       if (status === 'ACTIVE' && isFunded) {
-        const metriUrl = `https://app.metri.xyz/transfer/${lottery.address}/crc/${ticketPriceHuman}`;
+        const gnosisUrl = `https://app.gnosis.io/transfer/${lottery.address}/crc/${ticketPriceHuman}`;
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(lottery.address)}`;
         html += `<div style='margin:20px 0 8px 0; padding:18px 12px; background:#eafaf1; border-radius:10px; text-align:center;'>
           <div style='font-size:1.15em; color:#2980b9; margin-bottom:10px;'><b>Want to win <span style='color:#f39c12;'>${ethers.utils.formatUnits(prize, prizeTokenDecimals)} ${prizeSymbol}</span>?</b></div>
-          <a href='${metriUrl}' target='_blank' style='display:inline-block;margin:10px 0 12px 0;padding:12px 28px;background:linear-gradient(90deg,#4A90E2 0%,#50E3C2 100%);color:white;font-weight:bold;font-size:1.1em;border-radius:6px;text-decoration:none;box-shadow:0 2px 8px rgba(80,227,194,0.08);'>
-            Buy Ticket via Metri
+          <a href='${gnosisUrl}' target='_blank' style='display:inline-block;margin:10px 0 12px 0;padding:12px 28px;background:linear-gradient(90deg,#4A90E2 0%,#50E3C2 100%);color:white;font-weight:bold;font-size:1.1em;border-radius:6px;text-decoration:none;box-shadow:0 2px 8px rgba(80,227,194,0.08);'>
+            Buy Ticket via Gnosis
           </a>
           <div style='margin:14px 0 0 0;'>
             <img src='${qrUrl}' alt='QR code' style='display:block;margin:0 auto 6px auto;border-radius:8px;border:1.5px solid #27ae60;background:#fff;' />
@@ -610,13 +638,13 @@
       } else if (status === 'DRAWN') {
         html += `<div style='margin:16px 0 8px 0; font-size:1.2em; color:#27ae60; text-align:center;'><b>🎉 The lottery is over! Congratulations to our winner:</b></div>`;
       } else if (status === 'ENDED' && !drawn && !cancelled && participants && participants.length > 0) {
-        const metriUrl = `https://app.metri.xyz/transfer/${lottery.address}/crc/${ticketPriceHuman}`;
+        const gnosisUrl = `https://app.gnosis.io/transfer/${lottery.address}/crc/${ticketPriceHuman}`;
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(lottery.address)}`;
         html += `<div style='margin:20px 0 8px 0; padding:18px 12px; background:#eafaf1; border-radius:10px; text-align:center;'>
           <div style='font-size:1.15em; color:#e67e22; margin-bottom:10px;'><b>This lottery is over, but the winner has not been drawn yet.</b></div>
           <div style='font-size:1.08em; color:#2980b9; margin-bottom:10px;'><b>Send ${ticketPriceHuman} CRC to trigger the drawing.</b></div>
-          <a href='${metriUrl}' target='_blank' style='display:inline-block;margin:10px 0 12px 0;padding:12px 28px;background:linear-gradient(90deg,#4A90E2 0%,#50E3C2 100%);color:white;font-weight:bold;font-size:1.1em;border-radius:6px;text-decoration:none;box-shadow:0 2px 8px rgba(80,227,194,0.08);'>
-            Trigger Drawing via Metri
+          <a href='${gnosisUrl}' target='_blank' style='display:inline-block;margin:10px 0 12px 0;padding:12px 28px;background:linear-gradient(90deg,#4A90E2 0%,#50E3C2 100%);color:white;font-weight:bold;font-size:1.1em;border-radius:6px;text-decoration:none;box-shadow:0 2px 8px rgba(80,227,194,0.08);'>
+            Trigger Drawing via Gnosis
           </a>
           <div style='margin:14px 0 0 0;'>
             <img src='${qrUrl}' alt='QR code' style='display:block;margin:0 auto 6px auto;border-radius:8px;border:1.5px solid #27ae60;background:#fff;' />
@@ -631,20 +659,33 @@
       if (drawn && winner && winner !== ethers.constants.AddressZero) {
         // Laurel wreath SVG
         const laurel = `<svg width='80' height='80' viewBox='0 0 80 80' style='position:absolute;left:0;top:0;pointer-events:none;'><g><ellipse cx='40' cy='40' rx='36' ry='36' fill='none' stroke='#27ae60' stroke-width='4' stroke-dasharray='8 8' /></g></svg>`;
-        html += `<div style='display:flex;flex-direction:column;align-items:center;justify-content:center;margin:18px 0 18px 0;position:relative;'>
-          <div style='position:relative;width:80px;height:80px;'>
-            ${laurel}
-            <img src='${winnerAvatar}' alt='avatar' style='width:64px;height:64px;border-radius:50%;object-fit:cover;border:3px solid #27ae60;position:absolute;left:8px;top:8px;background:#fff;' />
-          </div>
-          <div style='margin-top:10px;font-size:1.2em;font-weight:bold;color:#27ae60;text-align:center;'>${winnerName ? winnerName : 'Winner'}</div>
-        </div>`;
+        const winnerProfileUrl = winner && winner !== ethers.constants.AddressZero ? `https://app.gnosis.io/${winner}` : null;
+        if (winnerProfileUrl) {
+          html += `<div style='display:flex;flex-direction:column;align-items:center;justify-content:center;margin:18px 0 18px 0;position:relative;'>
+            <a href='${winnerProfileUrl}' target='_blank' style='text-decoration:none;'>
+              <div style='position:relative;width:80px;height:80px;'>
+                ${laurel}
+                <img src='${winnerAvatar}' alt='avatar' style='width:64px;height:64px;border-radius:50%;object-fit:cover;border:3px solid #27ae60;position:absolute;left:8px;top:8px;background:#fff;' />
+              </div>
+              <div style='margin-top:10px;font-size:1.2em;font-weight:bold;color:#27ae60;text-align:center;'>${winnerName ? winnerName : winner.slice(0, 6) + '...' + winner.slice(-4)}</div>
+            </a>
+          </div>`;
+        } else {
+          html += `<div style='display:flex;flex-direction:column;align-items:center;justify-content:center;margin:18px 0 18px 0;position:relative;'>
+            <div style='position:relative;width:80px;height:80px;'>
+              ${laurel}
+              <img src='${winnerAvatar}' alt='avatar' style='width:64px;height:64px;border-radius:50%;object-fit:cover;border:3px solid #27ae60;position:absolute;left:8px;top:8px;background:#fff;' />
+            </div>
+            <div style='margin-top:10px;font-size:1.2em;font-weight:bold;color:#27ae60;text-align:center;'>${winnerName ? winnerName : 'Winner'}</div>
+          </div>`;
+        }
       }
       // Participants
       if (participants && participants.length > 0) {
         html += `<div class="participants-list" style='margin-top:18px;'><b>Participants:</b><ul style='list-style:none;padding-left:0;margin-top:8px;'>` + participants.map((p, i) => {
           const displayName = participantNames && participantNames[i] ? participantNames[i] : (p.slice(0, 6) + '...' + p.slice(-4));
           const avatar = participantAvatars && participantAvatars[i] ? participantAvatars[i] : 'https://ui-avatars.com/api/?name=Circles';
-          return `<li style='display:flex;align-items:center;gap:8px;margin-bottom:6px;'><img src='${avatar}' alt='avatar' style='width:28px;height:28px;border-radius:50%;object-fit:cover;border:1.5px solid #ccc;'/><a href='https://app.metri.xyz/${p}' target='_blank' style='text-decoration:none;color:#4A90E2;'>@${displayName}</a></li>`;
+          return `<li style='display:flex;align-items:center;gap:8px;margin-bottom:6px;'><img src='${avatar}' alt='avatar' style='width:28px;height:28px;border-radius:50%;object-fit:cover;border:1.5px solid #ccc;'/><a href='https://app.gnosis.io/${p}' target='_blank' style='text-decoration:none;color:#4A90E2;'>@${displayName}</a></li>`;
         }).join('') + `</ul></div>`;
       }
       const lotteryDetails = document.getElementById('lotteryDetails');

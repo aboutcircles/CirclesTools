@@ -172,6 +172,39 @@
                 margin: 0;
                 padding-left: 18px;
             }
+            th.sortable {
+                cursor: pointer;
+                user-select: none;
+                position: relative;
+                padding-right: 20px;
+            }
+            th.sortable:hover {
+                background: #d5d3f5;
+            }
+            th.sortable::after {
+                content: '⇅';
+                position: absolute;
+                right: 4px;
+                opacity: 0.4;
+                font-size: 0.85em;
+            }
+            th.sortable.sort-desc::after {
+                content: '▼';
+                opacity: 0.8;
+            }
+            th.sortable.sort-asc::after {
+                content: '▲';
+                opacity: 0.8;
+            }
+            .unit-label {
+                cursor: pointer;
+                text-decoration: underline;
+                text-decoration-style: dotted;
+                margin-left: 1px;
+            }
+            .unit-label:hover {
+                color: #5c49e4;
+            }
             .mint-btn {
                 background: #f4f4ff;
                 color: #191568;
@@ -427,6 +460,28 @@
                 provider,
             );
 
+            // CRC static/demurraged converter contract
+            const crcConverterContract = new ethers.Contract(
+                '0x0d8c4901Dd270Fe101B8014A5dbECC4e4432eB1E',
+                [
+                    { inputs: [{ internalType: "uint256", name: "_timestamp", type: "uint256" }], name: "day", outputs: [{ internalType: "uint64", name: "", type: "uint64" }], stateMutability: "view", type: "function" },
+                    { inputs: [{ internalType: "uint256", name: "_inflationaryValue", type: "uint256" }, { internalType: "uint64", name: "_day", type: "uint64" }], name: "convertInflationaryToDemurrageValue", outputs: [{ internalType: "uint256", name: "", type: "uint256" }], stateMutability: "pure", type: "function" }
+                ],
+                provider,
+            );
+            let staticToDemurragedFactor = 1;
+            let showDemurraged = true;
+            (async () => {
+                try {
+                    const day = await crcConverterContract.day(Math.floor(Date.now() / 1000));
+                    const result = await crcConverterContract.convertInflationaryToDemurrageValue(ethers.utils.parseEther('1'), day);
+                    staticToDemurragedFactor = parseFloat(ethers.utils.formatEther(result));
+                    console.log('Static→Demurraged factor:', staticToDemurragedFactor);
+                } catch (err) {
+                    console.error('Failed to fetch conversion factor:', err);
+                }
+            })();
+
             const checkButton = document.getElementById("checkButton");
             const resultDiv = document.getElementById("result");
             const groupInput = document.getElementById("groupInput");
@@ -473,16 +528,59 @@
                     const thead = document.createElement("thead");
                     const headerRow = document.createElement("tr");
                     const headers = [
-                        'Group Address', 'Owner', 'Fee Collection',
-                        'Static ERC20', 'Static ERC20 Price', 'Static ERC20 Supply',
-                        'Demurraged ERC20', 'Demurraged ERC20 Price', 'Demurraged ERC20 Supply',
-                        'ERC1155 Total Supply', 'Balance',
-                        'Membership Conditions', 'Service', 'Base Mint Handler', 'Base Mint Policy', 'Base Treasury'
+                        'Group Address', 'Owner', 'Total Supply',
+                        'Static ERC20', 'Price/', 'sERC20 Supply ', 'Market Cap',
+                        'Demurraged ERC20', 'Demurraged ERC20 Supply',
+                        'Membership Conditions', 'Service', 'Base Mint Handler', 'Base Mint Policy', 'Base Treasury', 'Fee Collection'
                     ];
+
+                    const unitToggleLabels = [];
+                    function toggleUnit(e) {
+                        if (e) e.stopPropagation();
+                        showDemurraged = !showDemurraged;
+                        const unitText = showDemurraged ? 'CRC' : 's-CRC';
+                        unitToggleLabels.forEach(s => { s.textContent = unitText; });
+                        updateAllRows();
+                    }
+
+                    const sortableColumns = { 2: 'sortErc1155Supply', 4: 'sortPrice', 5: 'sortSupply', 6: 'sortMarketCap', 8: 'sortDemurragedSupply' };
+                    let currentSort = { col: null, dir: null };
+
+                    function sortTable(tbody, sortKey, dir) {
+                        const rows = Array.from(tbody.querySelectorAll('tr'));
+                        rows.sort((a, b) => {
+                            const va = a[sortKey] || 0;
+                            const vb = b[sortKey] || 0;
+                            return dir === 'asc' ? va - vb : vb - va;
+                        });
+                        rows.forEach(r => tbody.appendChild(r));
+                    }
 
                     headers.forEach((headerText, idx) => {
                         const th = document.createElement("th");
                         th.textContent = headerText;
+                        // Add clickable unit toggle for Price and Supply headers
+                        if (idx === 2) {
+                            th.title = 'Total supply of ERC1155 CRC';
+                        }
+                        if (idx === 4 || idx === 5) {
+                            const unitSpan = document.createElement('span');
+                            unitSpan.className = 'unit-label';
+                            unitSpan.textContent = showDemurraged ? 'CRC' : 's-CRC';
+                            unitToggleLabels.push(unitSpan);
+                            unitSpan.addEventListener('click', toggleUnit);
+                            th.appendChild(unitSpan);
+                        }
+                        if (sortableColumns[idx]) {
+                            th.className = 'sortable';
+                            th.addEventListener('click', () => {
+                                const newDir = (currentSort.col === idx && currentSort.dir === 'desc') ? 'asc' : 'desc';
+                                currentSort = { col: idx, dir: newDir };
+                                headerRow.querySelectorAll('th.sortable').forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
+                                th.classList.add(newDir === 'asc' ? 'sort-asc' : 'sort-desc');
+                                sortTable(tbody, sortableColumns[idx], newDir);
+                            });
+                        }
                         headerRow.appendChild(th);
                     });
                     thead.appendChild(headerRow);
@@ -490,6 +588,36 @@
 
                     // Create table body
                     const tbody = document.createElement("tbody");
+
+                    // Helper: update a single row's display based on toggle state
+                    function updateRowDisplay(row) {
+                        const supplyFactor = showDemurraged ? staticToDemurragedFactor : 1;
+                        const priceFactor = showDemurraged ? (1 / staticToDemurragedFactor) : 1;
+                        const unit = showDemurraged ? ' CRC' : ' s-CRC';
+
+                        const displaySupply = row.rawSupply * supplyFactor;
+                        row.supplyCell.textContent = displaySupply.toLocaleString(undefined, { maximumFractionDigits: 2 }) + unit;
+                        row.sortSupply = displaySupply;
+
+                        if (row.rawPrice !== null) {
+                            const displayPrice = row.rawPrice * priceFactor;
+                            row.priceCell.textContent = displayPrice.toFixed(4);
+                            row.priceCell.appendChild(row.pricePoolDiv);
+                            row.sortPrice = displayPrice;
+
+                            // Market cap = ERC1155 supply × price per CRC
+                            const pricePerCRC = row.rawPrice / staticToDemurragedFactor;
+                            row.sortMarketCap = row.rawErc1155Supply * pricePerCRC;
+                            row.marketCapCell.textContent = row.sortMarketCap.toLocaleString(undefined, { maximumFractionDigits: 2 });
+                        }
+                    }
+
+                    function updateAllRows() {
+                        Array.from(tbody.querySelectorAll('tr')).forEach(updateRowDisplay);
+                        if (currentSort.col !== null) {
+                            sortTable(tbody, sortableColumns[currentSort.col], currentSort.dir);
+                        }
+                    }
 
                     // Add each group as a row
                     for (let i = 0; i < addresses.length; i++) {
@@ -555,11 +683,11 @@
                             if (isBaseMintHandler) {
                                 const mintBtn = document.createElement("button");
                                 mintBtn.className = "mint-btn icon-btn";
-                                mintBtn.title = "Mint via Metri";
+                                mintBtn.title = "Mint via Gnosis";
                                 mintBtn.innerHTML = `<svg width="18" height="18" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="9" cy="9" r="7.5" stroke="#191568" stroke-width="1.5"/><path d="M9 5v8M5 9h8" stroke="#191568" stroke-width="1.5" stroke-linecap="round"/></svg>`;
                                 mintBtn.onclick = (e) => {
                                     e.preventDefault();
-                                    window.open(`https://app.metri.xyz/transfer/${address}/crc`, '_blank');
+                                    window.open(`https://app.gnosis.io/transfer/${address}/crc`, '_blank');
                                 };
                                 mainRow.appendChild(mintBtn);
                             }
@@ -610,7 +738,10 @@
                         // Add cells to row
                         row.appendChild(createAddressCell(groupAddress, true));
                         row.appendChild(createAddressCell(info.owner));
-                        row.appendChild(createAddressCell(info.feeCollection));
+                        // ERC1155 Total Supply
+                        const erc1155SupplyVal = parseFloat(ethers.utils.formatEther(info.erc1155TotalSupply || 0));
+                        row.sortErc1155Supply = erc1155SupplyVal;
+                        row.appendChild(document.createElement('td')).textContent = erc1155SupplyVal.toLocaleString(undefined, { maximumFractionDigits: 2 });
                         // Static ERC20 (actually demurraged)
                         row.appendChild(createAddressCell(info.demurragedERC20, false, false, false, true, true));
                         // Static ERC20 Price
@@ -622,15 +753,12 @@
                         staticPoolDiv.style.gap = '4px';
                         staticPriceCell.appendChild(staticPoolDiv);
                         row.appendChild(staticPriceCell);
-                        getPrice(info.demurragedERC20).then(function updateStaticPrice(price) {
-                            staticPriceCell.textContent = price;
-                            staticPriceCell.appendChild(staticPoolDiv);
-                            if (price === 'N/A') {
-                                setTimeout(() => {
-                                    getPrice(info.demurragedERC20).then(updateStaticPrice);
-                                }, 5000);
-                            }
-                        });
+                        row.priceCell = staticPriceCell;
+                        row.pricePoolDiv = staticPoolDiv;
+                        row.rawPrice = null;
+                        row.sortPrice = 0;
+                        row.rawErc1155Supply = parseFloat(ethers.utils.formatEther(info.erc1155TotalSupply || 0));
+                        row.demurragedERC20Address = info.demurragedERC20;
                         function updateStaticPools(pools, error) {
                             staticPoolDiv.innerHTML = '';
                             if (error) {
@@ -659,60 +787,25 @@
                                 .catch(() => updateStaticPools([], true));
                         })();
                         // Static ERC20 Supply
-                        row.appendChild(document.createElement('td')).textContent = ethers.utils.formatEther(info.demurragedERC20TotalSupply || 0);
+                        const staticSupplyVal = parseFloat(ethers.utils.formatEther(info.demurragedERC20TotalSupply || 0));
+                        row.rawSupply = staticSupplyVal;
+                        row.sortSupply = staticSupplyVal;
+                        const supplyCell = document.createElement('td');
+                        supplyCell.textContent = staticSupplyVal.toLocaleString(undefined, { maximumFractionDigits: 2 });
+                        row.supplyCell = supplyCell;
+                        row.appendChild(supplyCell);
+                        // Market Cap (Price × Supply)
+                        const marketCapCell = document.createElement('td');
+                        marketCapCell.textContent = '...';
+                        row.sortMarketCap = 0;
+                        row.marketCapCell = marketCapCell;
+                        row.appendChild(marketCapCell);
                         // Demurraged ERC20 (actually static)
                         row.appendChild(createAddressCell(info.staticERC20, false, false, false, true, true));
-                        // Demurraged ERC20 Price
-                        const demurragedPriceCell = document.createElement('td');
-                        demurragedPriceCell.textContent = 'Loading...';
-                        // Always create a poolDiv for Balancer icons
-                        const demurragedPoolDiv = document.createElement('div');
-                        demurragedPoolDiv.style.display = 'flex';
-                        demurragedPoolDiv.style.gap = '4px';
-                        demurragedPriceCell.appendChild(demurragedPoolDiv);
-                        row.appendChild(demurragedPriceCell);
-                        getPrice(info.staticERC20).then(function updateDemurragedPrice(price) {
-                            demurragedPriceCell.textContent = price;
-                            demurragedPriceCell.appendChild(demurragedPoolDiv);
-                            if (price === 'N/A') {
-                                setTimeout(() => {
-                                    getPrice(info.staticERC20).then(updateDemurragedPrice);
-                                }, 5000);
-                            }
-                        });
-                        function updateDemurragedPools(pools, error) {
-                            demurragedPoolDiv.innerHTML = '';
-                            if (error) {
-                                setTimeout(() => {
-                                    getPoolsForToken(info.staticERC20).then((p) => updateDemurragedPools(p, null)).catch(() => updateDemurragedPools([], true));
-                                }, 5000);
-                                return;
-                            }
-                            if (pools.length > 0) {
-                                pools.forEach(pool => {
-                                    const balancerBtn = document.createElement('button');
-                                    balancerBtn.className = 'icon-btn';
-                                    balancerBtn.title = 'View on Balancer';
-                                    balancerBtn.innerHTML = `<svg width='22' height='22' viewBox='0 0 512 512' fill='none' xmlns='http://www.w3.org/2000/svg'><rect x='2' y='2' width='508' height='508' rx='254' fill='#004293'/><path d='M375.644 126.065C375.644 148.144 322.077 166.043 255.999 166.043C189.921 166.043 136.355 148.144 136.355 126.065C136.355 103.985 189.921 86.0862 255.999 86.0862C322.077 86.0862 375.644 103.985 375.644 126.065Z' fill='white'/><path d='M455.407 343.283C455.407 316.07 406.59 292.669 336.623 282.322L334.811 282.69C311.212 287.346 284.413 289.978 256 289.978C226.856 289.978 199.409 287.208 175.376 282.322C105.409 292.669 56.5918 316.07 56.5918 343.283C56.5918 380.082 145.869 409.914 256 409.914C366.13 409.914 455.407 380.082 455.407 343.283Z' fill='white'/><path d='M415.526 223.347C415.526 199.799 369.838 179.82 306.468 172.762L304.833 173.026C289.752 175.398 273.267 176.704 256 176.704C238.105 176.704 221.053 175.302 205.531 172.764C142.161 179.819 96.4734 199.801 96.4734 223.347C96.4734 252.786 167.895 276.652 256 276.652C344.104 276.652 415.526 252.786 415.526 223.347Z' fill='white'/><rect x='2' y='2' width='508' height='508' rx='254' stroke='#E5E7EB' stroke-width='4'/></svg>`;
-                                    balancerBtn.onclick = (e) => {
-                                        e.preventDefault();
-                                        window.open(`https://balancer.fi/pools/gnosis/v2/${pool.id}`, '_blank');
-                                    };
-                                    demurragedPoolDiv.appendChild(balancerBtn);
-                                });
-                            }
-                        }
-                        (function fetchDemurragedPools() {
-                            getPoolsForToken(info.staticERC20)
-                                .then(p => updateDemurragedPools(p, null))
-                                .catch(() => updateDemurragedPools([], true));
-                        })();
                         // Demurraged ERC20 Supply
-                        row.appendChild(document.createElement('td')).textContent = ethers.utils.formatEther(info.staticERC20TotalSupply || 0);
-                        // ERC1155 Total Supply
-                        row.appendChild(document.createElement('td')).textContent = ethers.utils.formatEther(info.erc1155TotalSupply || 0);
-                        // Balance
-                        row.appendChild(document.createElement('td')).textContent = ethers.utils.formatEther(info.balance || 0);
+                        const demurragedSupplyVal = parseFloat(ethers.utils.formatEther(info.staticERC20TotalSupply || 0));
+                        row.sortDemurragedSupply = demurragedSupplyVal;
+                        row.appendChild(document.createElement('td')).textContent = demurragedSupplyVal.toLocaleString(undefined, { maximumFractionDigits: 2 });
                         // Membership conditions
                         const conditionsCell = document.createElement('td');
                         if (info.membershipConditions.length > 0) {
@@ -742,12 +835,61 @@
                         row.appendChild(baseMintHandlerCell);
                         row.appendChild(createAddressCell(info.baseMintPolicy, false, false, false, true));
                         row.appendChild(createAddressCell(info.baseTreasury, false, false, false, true));
+                        row.appendChild(createAddressCell(info.feeCollection));
 
                         tbody.appendChild(row);
                     }
 
                     table.appendChild(tbody);
                     resultDiv.appendChild(table);
+
+                    // Default sort by Supply descending, apply demurraged conversion
+                    currentSort = { col: 5, dir: 'desc' };
+                    headerRow.querySelectorAll('th.sortable').forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
+                    headerRow.children[5].classList.add('sort-desc');
+                    updateAllRows();
+
+                    // Fetch prices sequentially, sorted by largest supply first
+                    // to be gentle with the Balancer API and avoid rate limiting
+                    (async function fetchPricesSequentially() {
+                        const rows = Array.from(tbody.querySelectorAll('tr'));
+                        rows.sort((a, b) => (b.rawSupply || 0) - (a.rawSupply || 0));
+
+                        for (const row of rows) {
+                            // Fetch static ERC20 price (from demurraged ERC20 address)
+                            if (row.demurragedERC20Address) {
+                                const price = await getPrice(row.demurragedERC20Address);
+                                if (price !== 'N/A') {
+                                    row.rawPrice = parseFloat(price) || 0;
+                                    updateRowDisplay(row);
+                                    if (currentSort.col === 4 || currentSort.col === 6) {
+                                        sortTable(tbody, sortableColumns[currentSort.col], currentSort.dir);
+                                    }
+                                } else {
+                                    row.priceCell.textContent = 'N/A';
+                                    row.priceCell.appendChild(row.pricePoolDiv);
+                                    // Schedule retry later with longer delay
+                                    (function retryStaticPrice(r) {
+                                        setTimeout(async () => {
+                                            const p = await getPrice(r.demurragedERC20Address);
+                                            if (p !== 'N/A') {
+                                                r.rawPrice = parseFloat(p) || 0;
+                                                updateRowDisplay(r);
+                                                if (currentSort.col === 4 || currentSort.col === 6) {
+                                                    sortTable(tbody, sortableColumns[currentSort.col], currentSort.dir);
+                                                }
+                                            } else {
+                                                retryStaticPrice(r);
+                                            }
+                                        }, 10000);
+                                    })(row);
+                                }
+                                // Gentle delay between API calls
+                                await new Promise(res => setTimeout(res, 500));
+                            }
+
+                        }
+                    })();
 
                 } catch (error) {
                     console.error(error);
@@ -771,10 +913,13 @@
 
             // Initialize the input with trusted groups on page load
             async function initializePage() {
-                // this is the address of the metri truster org
+                // this is the address of the gnosis truster org
                 const trusterAddress =
                     "0x0afd8899bca011bb95611409f09c8efbf6b169cf";
                 const trustedGroups = await fetchTrustedGroups(trusterAddress);
+                // Add extra groups not covered by the truster
+                const extraGroups = ['0x86533d1aDA8Ffbe7b6F7244F9A1b707f7f3e239b'];
+                extraGroups.forEach(g => { if (!trustedGroups.includes(g)) trustedGroups.push(g); });
                 if (trustedGroups.length > 0) {
                     groupInput.value = trustedGroups.join(", ");
                     // Automatically trigger the check
@@ -796,11 +941,11 @@
                 const thead = document.createElement('thead');
                 const headerRow = document.createElement('tr');
                 const headers = [
-                    'Group Address', 'Owner', 'Service', 'Fee Collection',
+                    'Group Address', 'Owner', 'Total Supply',
+                    'Service',
                     'Base Mint Handler', 'Base Mint Policy', 'Base Treasury',
                     'Static ERC20', 'Static ERC20 Price', 'Static ERC20 Supply',
-                    'ERC1155 Total Supply', 'Balance',
-                    'Membership Conditions'
+                    'Membership Conditions', 'Fee Collection'
                 ];
 
                 headers.forEach(headerText => {
@@ -838,16 +983,13 @@
                     // Add all fields
                     addRow(group.groupAddress, true);
                     addRow(group.owner, true);
+                    addRow(ethers.utils.formatEther(group.erc1155TotalSupply || 0));
                     addRow(group.service, true);
-                    addRow(group.feeCollection, true);
                     addRow(group.baseMintHandler, true);
                     addRow(group.baseMintPolicy, true);
                     addRow(group.baseTreasury, true);
                     addRow(group.staticERC20, true);
-                    addRow(ethers.utils.formatEther(group.erc1155TotalSupply || 0));
                     addRow(ethers.utils.formatEther(group.staticERC20TotalSupply || 0));
-                    addRow(ethers.utils.formatEther(group.balance || 0));
-
                     // Add membership conditions
                     const conditionsCell = document.createElement('td');
                     if (group.membershipConditions && group.membershipConditions.length > 0) {
@@ -870,6 +1012,7 @@
                         conditionsCell.textContent = 'None';
                     }
                     row.appendChild(conditionsCell);
+                    addRow(group.feeCollection, true);
 
                     tbody.appendChild(row);
                 });
@@ -903,7 +1046,7 @@
                           swapAmount: "0.1",
                           swapType: EXACT_IN,
                           tokenIn: "${erc20Address}",
-                          tokenOut: "0xaf204776c7245bf4147c2612bf6e5972ee483701"
+                          tokenOut: "0xe91d153e0b41518a2ce8dd3d7944fa863463a97d"
                         ) {
                           returnAmount
                           effectivePrice
