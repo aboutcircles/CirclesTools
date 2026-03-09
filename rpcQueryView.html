@@ -1801,6 +1801,59 @@
                 { name: 'filter', type: 'object', required: true, description: 'Filter: {fromBlock, toBlock, address, topics[]}. Example: {"fromBlock":"latest","toBlock":"latest","address":"0x..."}' }
             ]
         },
+        circles_getProfileCidBatch: {
+            category: 'avatar',
+            description: 'Get IPFS CIDs for multiple avatar profiles (batch)',
+            params: [
+                { name: 'addresses', type: 'address[]', required: true, description: 'Array of avatar addresses' }
+            ]
+        },
+        circles_getProfileByCidBatch: {
+            category: 'avatar',
+            description: 'Get multiple profile contents by IPFS CIDs (batch)',
+            params: [
+                { name: 'cids', type: 'string[]', required: true, description: 'Array of IPFS CIDs' }
+            ]
+        },
+        circles_getTrustInvitations: {
+            category: 'sdk',
+            description: 'Trust-based invitations (addresses that trust the target with sufficient balance)',
+            params: [
+                { name: 'address', type: 'address', required: true, description: 'Avatar address' },
+                { name: 'minimumBalance', type: 'string', required: false, description: 'Minimum CRC balance required (in wei)' }
+            ]
+        },
+        circles_getEscrowInvitations: {
+            category: 'sdk',
+            description: 'Escrow-based invitations (CRC escrowed for the target address)',
+            params: [
+                { name: 'address', type: 'address', required: true, description: 'Avatar address' }
+            ]
+        },
+        circles_getAtScaleInvitations: {
+            category: 'sdk',
+            description: 'At-scale invitations (pre-created unclaimed accounts)',
+            params: [
+                { name: 'address', type: 'address', required: true, description: 'Avatar address' }
+            ]
+        },
+        circles_getInvitationsFrom: {
+            category: 'sdk',
+            description: 'Accounts invited by a specific avatar (accepted or pending)',
+            params: [
+                { name: 'address', type: 'address', required: true, description: 'Inviter avatar address' },
+                { name: 'accepted', type: 'boolean', required: false, default: false, description: 'true=registered accounts, false=pending invitations' }
+            ]
+        },
+        circles_paginated_query: {
+            category: 'query',
+            description: 'Execute a structured query with cursor-based pagination (returns hasMore + nextCursor)',
+            isQueryBuilder: true,
+            params: [
+                { name: 'query', type: 'object', required: true, description: 'SelectDto query definition' },
+                { name: 'cursor', type: 'string', required: false, description: 'Cursor from previous response for next page' }
+            ]
+        },
         circles_health: {
             category: 'system',
             description: 'Health check endpoint',
@@ -2018,6 +2071,35 @@
                 executeRequest();
             }
         });
+
+        // URL query parameter support: ?method=circlesV2_findPath&server=staging2
+        var urlParams = new URLSearchParams(window.location.search);
+        var paramServer = urlParams.get('server');
+        if (paramServer && SERVERS[paramServer]) {
+            currentServer = paramServer;
+            document.getElementById('serverSelect').value = paramServer;
+            var server = SERVERS[paramServer];
+            document.getElementById('serverUrl').textContent = server.rpc.replace('https://', '').replace(/\/$/, '');
+            checkServerStatus();
+        }
+        var paramMethod = urlParams.get('method');
+        if (paramMethod && METHODS[paramMethod]) {
+            // Find the sidebar item and select it
+            var sidebarItem = document.querySelector('.method-item[data-method="' + paramMethod + '"]');
+            if (sidebarItem) {
+                // Expand the category if collapsed
+                var categoryList = sidebarItem.closest('.category-list');
+                if (categoryList && categoryList.classList.contains('collapsed')) {
+                    var header = categoryList.previousElementSibling;
+                    if (header) {
+                        header.classList.remove('collapsed');
+                        categoryList.classList.remove('collapsed');
+                    }
+                }
+                selectMethod(paramMethod, sidebarItem);
+                sidebarItem.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            }
+        }
     });
 
     function initSidebar() {
@@ -2350,6 +2432,11 @@
         if (element) element.classList.add('active');
 
         currentMethod = methodName;
+        // Update URL without reloading so links can be shared
+        var newUrl = new URL(window.location);
+        newUrl.searchParams.set('method', methodName);
+        history.replaceState(null, '', newUrl);
+
         var config = METHODS[methodName];
 
         var builder = document.getElementById('builderCard');
