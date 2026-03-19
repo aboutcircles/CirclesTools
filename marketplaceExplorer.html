@@ -393,6 +393,11 @@
     var orderPage = 1;
 
     // ─── Init ────────────────────────────────────────────────────────
+    // Re-init on bfcache restore (Brave/Safari back-forward cache)
+    window.addEventListener('pageshow', function(e) {
+        if (e.persisted && !catalogItems.length) loadSellersAndCatalog();
+    });
+
     (function init() {
         var params = new URLSearchParams(window.location.search);
         var override = params.get('marketplaceApi') || params.get('api');
@@ -599,6 +604,21 @@
                 }, truncAddr(sellerAddr));
                 sellerRow.appendChild(sellerLink);
                 card.appendChild(sellerRow);
+                // Async-enrich seller name + type badge on the card
+                (function(row, link, addr) {
+                    enrichSeller(addr).then(function(info) {
+                        if (info.name) link.textContent = info.name;
+                        if (info.type) {
+                            var badge = el('span', {
+                                style: 'margin-left:4px;font-size:0.7rem;padding:1px 5px;border-radius:8px;' +
+                                    (info.type === 'human' ? 'background:#dcfce7;color:#166534;' :
+                                     info.type === 'organization' ? 'background:#dbeafe;color:#1e40af;' :
+                                     'background:#f3f4f6;color:#374151;')
+                            }, info.type);
+                            row.appendChild(badge);
+                        }
+                    });
+                })(sellerRow, sellerLink, sellerAddr);
             }
 
             var sku = p.sku || item.sku || '';
@@ -646,6 +666,7 @@
             var chain = seller.chainId || '100';
             var row = el('tr');
 
+            // Address
             var addrCell = el('td', {className: 'address-cell'});
             addrCell.appendChild(document.createTextNode(truncAddr(addr) + ' '));
             var cpBtn = el('button', {className: 'copy-btn', title: 'Copy address',
@@ -654,25 +675,44 @@
             addrCell.appendChild(cpBtn);
             row.appendChild(addrCell);
 
+            // Chain
             row.appendChild(el('td', {}, String(chain)));
 
-            var nameCell = el('td', {}, 'Loading...');
-            row.appendChild(nameCell);
-            enrichProfileName(addr).then(function(name) {
-                nameCell.textContent = name;
-            });
+            // Profile + type (async enriched)
+            var infoCell = el('td', {}, 'Loading...');
+            row.appendChild(infoCell);
 
+            // Actions (async — links depend on enrichment)
             var actCell = el('td');
-            var profileBtn = el('a', {
-                className: 'btn btn-sm btn-outline',
-                href: 'profileChecker.html?address=' + addr,
-                target: '_blank',
-                style: 'text-decoration:none;display:inline-flex;align-items:center;gap:4px;'
-            });
-            profileBtn.appendChild(el('i', {className: 'fas fa-user'}));
-            profileBtn.appendChild(document.createTextNode(' Profile'));
-            actCell.appendChild(profileBtn);
             row.appendChild(actCell);
+
+            enrichSeller(addr).then(function(info) {
+                infoCell.textContent = '';
+                renderSellerInfo(infoCell, info, addr);
+
+                // Actions: always show on-chain link, conditionally show CID history
+                var onChainBtn = el('a', {
+                    className: 'btn btn-sm btn-outline',
+                    href: 'profileChecker.html?address=' + addr,
+                    target: '_blank',
+                    style: 'text-decoration:none;display:inline-flex;align-items:center;gap:4px;margin-right:6px;'
+                });
+                onChainBtn.appendChild(el('i', {className: 'fas fa-link'}));
+                onChainBtn.appendChild(document.createTextNode(' On-chain'));
+                actCell.appendChild(onChainBtn);
+
+                if (info.hasCidHistory) {
+                    var cidBtn = el('a', {
+                        className: 'btn btn-sm btn-outline',
+                        href: 'profileHistory.html?address=' + addr,
+                        target: '_blank',
+                        style: 'text-decoration:none;display:inline-flex;align-items:center;gap:4px;'
+                    });
+                    cidBtn.appendChild(el('i', {className: 'fas fa-clock-rotate-left'}));
+                    cidBtn.appendChild(document.createTextNode(' CID History'));
+                    actCell.appendChild(cidBtn);
+                }
+            });
 
             tbody.appendChild(row);
         });
@@ -681,18 +721,72 @@
         container.appendChild(table);
     }
 
-    async function enrichProfileName(address) {
+    // Seller info cache: { address: { name, type, hasCidHistory } }
+    var sellerInfoCache = {};
+
+    async function enrichSeller(address) {
+        var key = address.toLowerCase();
+        if (sellerInfoCache[key]) return sellerInfoCache[key];
+
+        var info = { name: null, type: null, hasCidHistory: false };
+
+        // Profile name from pinning service
         try {
-            var res = await fetch(PROFILES_API + '/search?address=' + address.toLowerCase());
-            if (!res.ok) return 'Unknown';
-            var data = await res.json();
-            if (Array.isArray(data)) {
-                var profile = data.find(function(p) { return p.address && p.address.toLowerCase() === address.toLowerCase(); });
-                return profile ? (profile.name || 'No name') : 'Not found';
+            var res = await fetch(PROFILES_API + '/search?address=' + key);
+            if (res.ok) {
+                var data = await res.json();
+                if (Array.isArray(data)) {
+                    var profile = data.find(function(p) { return p.address && p.address.toLowerCase() === key; });
+                    if (profile) info.name = profile.name || null;
+                }
             }
-            return 'Unknown';
-        } catch (e) {
-            return 'Error';
+        } catch (e) {}
+
+        // On-chain type from Circles RPC
+        try {
+            var rpcRes = await fetch('https://rpc.aboutcircles.com', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({jsonrpc:'2.0',id:1,method:'circles_query',params:[
+                    'select avatar, avatar_type from v_avatars where avatar = \'' + key + '\' limit 1'
+                ]})
+            });
+            if (rpcRes.ok) {
+                var rpcData = await rpcRes.json();
+                var rows = rpcData.result && rpcData.result.rows;
+                if (rows && rows.length) info.type = rows[0][1] || null; // avatar_type
+            }
+        } catch (e) {}
+
+        // CID history availability (quick check)
+        try {
+            var histRes = await fetch(PROFILES_API + '/avatar/' + key + '/history?limit=1&offset=0');
+            if (histRes.ok) {
+                var histData = await histRes.json();
+                var entries = Array.isArray(histData) ? histData : (histData.history || []);
+                info.hasCidHistory = entries.length > 0;
+            }
+        } catch (e) {}
+
+        sellerInfoCache[key] = info;
+        return info;
+    }
+
+    function renderSellerInfo(container, info, addr) {
+        // Name or address
+        var label = info.name || truncAddr(addr);
+        container.appendChild(document.createTextNode(label));
+
+        // On-chain type badge
+        if (info.type) {
+            var badge = el('span', {
+                style: 'margin-left:6px;font-size:0.75rem;padding:1px 6px;border-radius:8px;' +
+                    (info.type === 'human' ? 'background:#dcfce7;color:#166534;' :
+                     info.type === 'organization' ? 'background:#dbeafe;color:#1e40af;' :
+                     info.type === 'group' ? 'background:#e0e7ff;color:#3730a3;' :
+                     'background:#f3f4f6;color:#374151;')
+            }, info.type);
+            container.appendChild(badge);
         }
     }
 
