@@ -365,8 +365,8 @@
         <div class="api-config">
             <i class="fas fa-server"></i>
             <select id="endpointSelect" style="padding:4px 8px;border:1px solid var(--border);border-radius:4px;font-family:inherit;font-size:0.85rem;">
-                <option value="https://profiles.staging.aboutcircles.com">Staging</option>
                 <option value="https://profiles.aboutcircles.com">Production</option>
+                <option value="https://profiles.staging.aboutcircles.com">Staging</option>
             </select>
             <code id="apiUrlDisplay"></code>
         </div>
@@ -399,8 +399,7 @@
 
     <script>
     // ─── Configuration ───────────────────────────────────────────────
-    const DEFAULT_API = 'https://profiles.staging.aboutcircles.com';
-    // prod subdomain (profiles.aboutcircles.com) not yet live; will migrate later
+    const DEFAULT_API = 'https://profiles.aboutcircles.com';
     const PAGE_SIZE = 50;
 
     let apiBase = DEFAULT_API;
