@@ -541,6 +541,18 @@
         }
     }
 
+    function scrollToSeller(addr) {
+        switchTab('sellers');
+        setTimeout(function() {
+            var card = document.getElementById('seller-' + addr.toLowerCase());
+            if (card) {
+                card.scrollIntoView({behavior: 'smooth', block: 'center'});
+                card.style.boxShadow = '0 0 0 3px var(--accent)';
+                setTimeout(function() { card.style.boxShadow = ''; }, 2000);
+            }
+        }, 50);
+    }
+
     function filterCatalogBySeller(addr) {
         catalogFilterSeller = addr;
         switchTab('catalog');
@@ -629,7 +641,7 @@
                 var sellerLink = el('a', {
                     className: 'seller-link',
                     href: '#',
-                    onClick: (function(a) { return function(e) { e.preventDefault(); filterCatalogBySeller(a); }; })(sellerAddr)
+                    onClick: (function(a) { return function(e) { e.preventDefault(); scrollToSeller(a); }; })(sellerAddr)
                 }, truncAddr(sellerAddr));
                 sellerRow.appendChild(sellerLink);
                 card.appendChild(sellerRow);
@@ -652,7 +664,17 @@
 
             var sku = p.sku || item.sku || '';
             if (sku) {
-                card.appendChild(el('div', {className: 'meta'}, 'SKU: ' + sku));
+                var skuRow = el('div', {className: 'meta', style: 'display:flex;align-items:center;gap:6px;'});
+                skuRow.appendChild(document.createTextNode('SKU: ' + sku));
+                if (sellerAddr) {
+                    var stockBtn = el('button', {className: 'btn btn-sm btn-outline',
+                        style: 'font-size:0.75rem;padding:2px 8px;margin-left:auto;',
+                        onClick: (function(s, a) { return function() { checkInventoryFor(a, s); }; })(sku, sellerAddr)});
+                    stockBtn.appendChild(el('i', {className: 'fas fa-warehouse', style: 'margin-right:3px;'}));
+                    stockBtn.appendChild(document.createTextNode('Stock'));
+                    skuRow.appendChild(stockBtn);
+                }
+                card.appendChild(skuRow);
             }
 
             grid.appendChild(card);
@@ -671,7 +693,7 @@
         }
     }
 
-    // ─── Sellers table ───────────────────────────────────────────────
+    // ─── Sellers (card layout) ──────────────────────────────────────
     function renderSellersTable() {
         var container = clearEl('sellersContent');
 
@@ -680,80 +702,140 @@
             return;
         }
 
-        var table = el('table');
-        var thead = el('thead');
-        var hr = el('tr');
-        ['Address', 'Chain', 'Profile', 'Actions'].forEach(function(h) {
-            hr.appendChild(el('th', {}, h));
-        });
-        thead.appendChild(hr);
-        table.appendChild(thead);
+        var grid = el('div', {className: 'card-grid'});
 
-        var tbody = el('tbody');
         sellersList.forEach(function(seller) {
             var addr = seller.seller || seller.address || String(seller);
             var chain = seller.chainId || '100';
-            var row = el('tr');
+            var card = el('div', {className: 'product-card', id: 'seller-' + addr.toLowerCase()});
 
-            // Address
-            var addrCell = el('td', {className: 'address-cell'});
-            addrCell.appendChild(document.createTextNode(truncAddr(addr) + ' '));
+            // Header: name + type badge (async)
+            var nameRow = el('div', {style: 'display:flex;align-items:center;gap:8px;margin-bottom:4px;'});
+            var nameEl = el('h3', {style: 'margin:0;'}, 'Loading...');
+            nameRow.appendChild(nameEl);
+            card.appendChild(nameRow);
+
+            // Address row
+            var addrRow = el('div', {className: 'meta', style: 'font-family:monospace;display:flex;align-items:center;gap:4px;'});
+            addrRow.appendChild(document.createTextNode(truncAddr(addr)));
             var cpBtn = el('button', {className: 'copy-btn', title: 'Copy address',
                 onClick: function() { copyText(addr); }});
             cpBtn.appendChild(el('i', {className: 'fas fa-copy'}));
-            addrCell.appendChild(cpBtn);
-            row.appendChild(addrCell);
+            addrRow.appendChild(cpBtn);
+            addrRow.appendChild(document.createTextNode(' \u00B7 Chain ' + chain));
+            card.appendChild(addrRow);
 
-            // Chain
-            row.appendChild(el('td', {}, String(chain)));
+            // Gateways (async — populated after allGateways loads)
+            var gwRow = el('div', {className: 'meta', style: 'margin-top:6px;'}, '');
+            gwRow.id = 'gw-' + addr.toLowerCase();
+            card.appendChild(gwRow);
 
-            // Profile + type (async enriched)
-            var infoCell = el('td', {}, 'Loading...');
-            row.appendChild(infoCell);
+            // Actions row
+            var actions = el('div', {style: 'display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;'});
+            var btnStyle = 'display:inline-flex;align-items:center;gap:4px;font-size:0.8rem;padding:4px 10px;';
 
-            // Actions (async — links depend on enrichment)
-            var actCell = el('td');
-            row.appendChild(actCell);
-
-            // Actions: view products (filter catalog) + gnosisscan
-            var productsBtn = el('button', {
-                className: 'btn btn-sm btn-outline',
-                style: 'display:inline-flex;align-items:center;gap:4px;margin-right:6px;',
-                onClick: (function(a) { return function() { filterCatalogBySeller(a); }; })(addr)
-            });
+            var productsBtn = el('button', {className: 'btn btn-sm btn-outline', style: btnStyle,
+                onClick: (function(a) { return function() { filterCatalogBySeller(a); }; })(addr)});
             productsBtn.appendChild(el('i', {className: 'fas fa-boxes-stacked'}));
             productsBtn.appendChild(document.createTextNode(' Products'));
-            actCell.appendChild(productsBtn);
+            actions.appendChild(productsBtn);
 
-            var payBtn = el('button', {
-                className: 'btn btn-sm btn-outline',
-                style: 'display:inline-flex;align-items:center;gap:4px;margin-right:6px;',
-                onClick: (function(a) { return function() { filterPaymentsBySeller(a); }; })(addr)
-            });
+            var payBtn = el('button', {className: 'btn btn-sm btn-outline', style: btnStyle,
+                onClick: (function(a) { return function() { filterPaymentsBySeller(a); }; })(addr)});
             payBtn.appendChild(el('i', {className: 'fas fa-credit-card'}));
             payBtn.appendChild(document.createTextNode(' Payments'));
-            actCell.appendChild(payBtn);
+            actions.appendChild(payBtn);
 
-            var scanBtn = el('a', {
-                className: 'btn btn-sm btn-outline',
-                href: 'https://gnosisscan.io/address/' + addr,
-                target: '_blank',
-                style: 'text-decoration:none;display:inline-flex;align-items:center;gap:4px;'
-            });
+            var scanBtn = el('a', {className: 'btn btn-sm btn-outline',
+                href: 'https://gnosisscan.io/address/' + addr, target: '_blank',
+                style: 'text-decoration:none;' + btnStyle});
             scanBtn.appendChild(el('i', {className: 'fas fa-arrow-up-right-from-square'}));
             scanBtn.appendChild(document.createTextNode(' Gnosisscan'));
-            actCell.appendChild(scanBtn);
+            actions.appendChild(scanBtn);
 
-            enrichSeller(addr).then(function(info) {
-                infoCell.textContent = '';
-                renderSellerInfo(infoCell, info, addr);
-            });
+            card.appendChild(actions);
 
-            tbody.appendChild(row);
+            // Async enrich name + type
+            (function(ne, addr) {
+                enrichSeller(addr).then(function(info) {
+                    ne.textContent = info.name || truncAddr(addr);
+                    if (info.type) {
+                        var badge = el('span', {
+                            style: 'font-size:0.7rem;padding:1px 6px;border-radius:8px;margin-left:6px;' +
+                                (info.type === 'human' ? 'background:#dcfce7;color:#166534;' :
+                                 info.type === 'organization' ? 'background:#dbeafe;color:#1e40af;' :
+                                 info.type === 'group' ? 'background:#e0e7ff;color:#3730a3;' :
+                                 'background:#f3f4f6;color:#374151;')
+                        }, info.type);
+                        ne.appendChild(badge);
+                    }
+                });
+            })(nameEl, addr);
+
+            grid.appendChild(card);
         });
 
-        table.appendChild(tbody);
-        container.appendChild(table);
+        container.appendChild(grid);
+
+        // Populate gateway info after gateways are loaded
+        loadGatewaysForSellers();
+    }
+
+    async function loadGatewaysForSellers() {
+        // Ensure gateways are loaded
+        if (!Object.keys(allGateways).length) {
+            try {
+                var gwResult = await rpcQuery('CrcV2_PaymentGateway', 'GatewayCreated',
+                    ['owner', 'gateway', 'blockNumber', 'timestamp'], [], 200);
+                (gwResult.rows || []).forEach(function(r) {
+                    allGateways[r[1].toLowerCase()] = { owner: r[0], gateway: r[1], block: r[2], created: r[3] };
+                });
+            } catch (e) { return; }
+        }
+
+        // Group gateways by owner
+        var byOwner = {};
+        Object.values(allGateways).forEach(function(gw) {
+            var key = gw.owner.toLowerCase();
+            if (!byOwner[key]) byOwner[key] = [];
+            byOwner[key].push(gw);
+        });
+
+        // Render into each seller card
+        sellersList.forEach(function(seller) {
+            var addr = (seller.seller || seller.address || String(seller)).toLowerCase();
+            var gwRow = document.getElementById('gw-' + addr);
+            if (!gwRow) return;
+
+            var gws = byOwner[addr] || [];
+            if (!gws.length) {
+                gwRow.appendChild(el('span', {style: 'color:var(--text-muted);'}, 'No payment gateway'));
+                return;
+            }
+
+            gwRow.appendChild(el('i', {className: 'fas fa-landmark', style: 'margin-right:4px;color:var(--primary);'}));
+            gwRow.appendChild(document.createTextNode(gws.length + ' gateway' + (gws.length > 1 ? 's' : '') + ': '));
+
+            gws.forEach(function(gw, i) {
+                if (i > 0) gwRow.appendChild(document.createTextNode(', '));
+                var gwLink = el('a', {href: '#', className: 'seller-link', style: 'font-family:monospace;font-size:0.8rem;',
+                    onClick: (function(g) { return function(e) {
+                        e.preventDefault();
+                        // Filter payments by this specific gateway
+                        paymentFilterSeller = null;
+                        paymentFilterGateway = g;
+                        paymentsLoaded = false;
+                        switchTab('payments');
+                        loadPayments();
+                    }; })(gw.gateway)
+                }, truncAddr(gw.gateway));
+                gwRow.appendChild(gwLink);
+                var cp = el('button', {className: 'copy-btn', title: 'Copy gateway address',
+                    onClick: function() { copyText(gw.gateway); }});
+                cp.appendChild(el('i', {className: 'fas fa-copy', style: 'font-size:0.7rem;'}));
+                gwRow.appendChild(cp);
+            });
+        });
     }
 
     // Seller info cache: { address: { name, type, hasCidHistory } }
@@ -839,6 +921,7 @@
     var allPayments = [];
     var allGateways = {};
     var paymentFilterSeller = null;
+    var paymentFilterGateway = null;
 
     function rpcQuery(namespace, table, columns, filter, limit, order) {
         var params = {Namespace: namespace, Table: table, Columns: columns, Filter: filter || [], Limit: limit || 50};
@@ -870,7 +953,7 @@
     }
 
     async function loadPayments() {
-        if (paymentsLoaded && !paymentFilterSeller) return;
+        if (paymentsLoaded && !paymentFilterSeller && !paymentFilterGateway) return;
         var container = document.getElementById('paymentsContent');
         showLoading(container);
 
@@ -884,10 +967,13 @@
                 });
             }
 
-            // Load payments
+            // Load payments with filters
             var filter = [];
             if (paymentFilterSeller) {
                 filter.push({Type:'FilterPredicate', FilterType:'Equals', Column:'payee', Value: paymentFilterSeller.toLowerCase()});
+            }
+            if (paymentFilterGateway) {
+                filter.push({Type:'FilterPredicate', FilterType:'Equals', Column:'gateway', Value: paymentFilterGateway.toLowerCase()});
             }
             var result = await rpcQuery('CrcV2_PaymentGateway', 'PaymentReceived',
                 ['payer', 'payee', 'gateway', 'amount', 'data', 'timestamp', 'transactionHash', 'blockNumber'],
@@ -895,7 +981,7 @@
                 [{Column:'blockNumber', SortOrder:'DESC'}]);
 
             allPayments = result.rows || [];
-            paymentsLoaded = !paymentFilterSeller;
+            paymentsLoaded = !paymentFilterSeller && !paymentFilterGateway;
             renderPayments();
         } catch (err) {
             showError(container, 'Failed to load payments: ' + err.message);
@@ -911,6 +997,7 @@
 
     function clearPaymentFilter() {
         paymentFilterSeller = null;
+        paymentFilterGateway = null;
         paymentsLoaded = false;
         loadPayments();
     }
@@ -940,12 +1027,16 @@
         container.appendChild(stats);
 
         // Filter banner
-        if (paymentFilterSeller) {
-            var banner = el('div', {style: 'display:flex;align-items:center;gap:8px;padding:8px 12px;background:#dbeafe;border-radius:6px;margin-bottom:12px;font-size:0.9rem;'});
+        if (paymentFilterSeller || paymentFilterGateway) {
+            var banner = el('div', {style: 'display:flex;align-items:center;gap:8px;padding:8px 12px;background:#dbeafe;border-radius:6px;margin-bottom:12px;font-size:0.9rem;flex-wrap:wrap;'});
             banner.appendChild(el('i', {className: 'fas fa-filter', style: 'color:#1e40af;'}));
-            var info = sellerInfoCache[paymentFilterSeller.toLowerCase()];
-            var label = info && info.name ? info.name : truncAddr(paymentFilterSeller);
-            banner.appendChild(document.createTextNode('Payments to: ' + label + ' '));
+            if (paymentFilterGateway) {
+                banner.appendChild(document.createTextNode('Gateway: ' + truncAddr(paymentFilterGateway) + ' '));
+            } else {
+                var info = sellerInfoCache[paymentFilterSeller.toLowerCase()];
+                var label = info && info.name ? info.name : truncAddr(paymentFilterSeller);
+                banner.appendChild(document.createTextNode('Payments to: ' + label + ' '));
+            }
             var jumpProducts = el('button', {className: 'btn btn-sm btn-outline', style: 'margin-left:8px;',
                 onClick: (function(a) { return function() { filterCatalogBySeller(a); }; })(paymentFilterSeller)});
             jumpProducts.appendChild(el('i', {className: 'fas fa-boxes-stacked', style: 'margin-right:4px;'}));
@@ -1100,6 +1191,17 @@
     function viewSellerPayments(addr) { filterPaymentsBySeller(addr); }
 
     // ─── Inventory ───────────────────────────────────────────────────
+    function checkInventoryFor(seller, sku) {
+        switchTab('inventory');
+        setTimeout(function() {
+            var sellerEl = document.getElementById('invSeller');
+            var skuEl = document.getElementById('invSku');
+            if (sellerEl) sellerEl.value = seller;
+            if (skuEl) skuEl.value = sku;
+            checkInventory();
+        }, 50);
+    }
+
     function renderInventoryForm() {
         var container = clearEl('inventoryContent');
 
