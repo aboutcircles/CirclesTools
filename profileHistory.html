@@ -1085,7 +1085,8 @@
         if (restoreBtn) { restoreBtn.disabled = true; restoreBtn.textContent = 'Connecting...'; }
 
         try {
-            await loadEthers();
+            try { await loadEthers(); } catch (e) { throw new Error('Failed to load ethers.js — CDN may be blocked by your browser'); }
+            if (typeof ethers === 'undefined') throw new Error('ethers.js failed to initialize');
             if (!window.ethereum) throw new Error('No wallet found. Install MetaMask or similar.');
 
             var provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -1108,9 +1109,9 @@
             setTimeout(function() { checkHistory(); }, 2000);
         } catch (err) {
             console.error('Restore failed:', err);
+            var msg = err.reason || err.message || String(err);
             if (restoreBtn) { restoreBtn.disabled = false; restoreBtn.textContent = 'Restore'; }
-            var body = document.getElementById('inspectBody');
-            if (body) body.appendChild(el('div', {className: 'error-msg', style: 'margin-top:8px;'}, 'Restore failed: ' + (err.reason || err.message)));
+            alert('Restore failed: ' + msg);
         }
     }
     </script>
