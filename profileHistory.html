@@ -386,8 +386,17 @@
         <div>
             <h1><i class="fas fa-clock-rotate-left" style="margin-right: 8px;"></i>Profile CID History</h1>
         </div>
-        <div class="header-links">
-            <a href="index.html"><i class="fas fa-home"></i> Tools</a>
+        <div style="display:flex;align-items:center;gap:12px;">
+            <div id="walletBar" style="display:none;font-size:0.85rem;padding:4px 12px;background:rgba(255,255,255,0.1);border-radius:20px;display:none;align-items:center;gap:6px;">
+                <span style="width:8px;height:8px;border-radius:50%;background:var(--success);"></span>
+                <span id="walletAddr"></span>
+                <button id="walletDisconnect" style="background:none;border:none;color:rgba(255,255,255,0.6);cursor:pointer;font-size:0.8rem;padding:2px 4px;" title="Disconnect">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </div>
+            <div class="header-links">
+                <a href="index.html"><i class="fas fa-home"></i> Tools</a>
+            </div>
         </div>
     </header>
 
@@ -1076,30 +1085,64 @@
         return '0x' + Array.from(digest).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
     }
 
+    var connectedSigner = null;
+    var connectedAddr = null;
+
+    function showWallet(addr) {
+        connectedAddr = addr;
+        var bar = document.getElementById('walletBar');
+        bar.style.display = 'flex';
+        document.getElementById('walletAddr').textContent = addr.slice(0,6) + '...' + addr.slice(-4);
+    }
+
+    function hideWallet() {
+        connectedSigner = null;
+        connectedAddr = null;
+        document.getElementById('walletBar').style.display = 'none';
+    }
+
+    document.getElementById('walletDisconnect').addEventListener('click', hideWallet);
+
+    async function connectWallet() {
+        try { await loadEthers(); } catch (e) { throw new Error('Failed to load ethers.js — CDN may be blocked'); }
+        if (typeof ethers === 'undefined') throw new Error('ethers.js failed to initialize');
+        if (!window.ethereum) throw new Error('No wallet detected. Install MetaMask or similar.');
+
+        var provider = new ethers.providers.Web3Provider(window.ethereum);
+        await provider.send('eth_requestAccounts', []);
+        connectedSigner = provider.getSigner();
+        var addr = await connectedSigner.getAddress();
+        showWallet(addr);
+        return addr;
+    }
+
     async function restoreProfile(cid) {
         if (!cid || !currentAddress) return;
-        if (!confirm('Restore profile to CID:\n' + cid + '\n\nThis will update your on-chain profile metadata. You must be the owner of address ' + currentAddress + '.'))
-            return;
 
         var restoreBtn = document.getElementById('restoreBtn');
-        if (restoreBtn) { restoreBtn.disabled = true; restoreBtn.textContent = 'Connecting...'; }
 
         try {
-            try { await loadEthers(); } catch (e) { throw new Error('Failed to load ethers.js — CDN may be blocked by your browser'); }
-            if (typeof ethers === 'undefined') throw new Error('ethers.js failed to initialize');
-            if (!window.ethereum) throw new Error('No wallet found. Install MetaMask or similar.');
+            // Step 1: Connect wallet if not connected
+            if (!connectedAddr) {
+                if (restoreBtn) { restoreBtn.disabled = true; restoreBtn.textContent = 'Connect wallet...'; }
+                await connectWallet();
+            }
 
-            var provider = new ethers.providers.Web3Provider(window.ethereum);
-            await provider.send('eth_requestAccounts', []);
-            var signer = provider.getSigner();
-            var signerAddr = await signer.getAddress();
+            // Step 2: Verify address match
+            if (connectedAddr.toLowerCase() !== currentAddress.toLowerCase()) {
+                alert('Wrong wallet connected!\n\nConnected: ' + connectedAddr + '\nNeeded: ' + currentAddress + '\n\nPlease switch to the correct account in your wallet and try again.');
+                if (restoreBtn) { restoreBtn.disabled = false; restoreBtn.textContent = 'Restore'; }
+                return;
+            }
 
-            if (signerAddr.toLowerCase() !== currentAddress.toLowerCase())
-                throw new Error('Connected wallet (' + signerAddr.slice(0,6) + '...) does not match profile address (' + currentAddress.slice(0,6) + '...).');
+            // Step 3: Confirm
+            if (!confirm('Restore profile to CID:\n' + cid + '\n\nThis sends a transaction from ' + connectedAddr.slice(0,6) + '...' + connectedAddr.slice(-4)))
+                return;
 
+            // Step 4: Send tx
             if (restoreBtn) restoreBtn.textContent = 'Sending tx...';
             var bytes32 = cidV0ToBytes32(cid);
-            var contract = new ethers.Contract(NAME_REGISTRY, NAME_REGISTRY_ABI, signer);
+            var contract = new ethers.Contract(NAME_REGISTRY, NAME_REGISTRY_ABI, connectedSigner);
             var tx = await contract.updateMetadataDigest(bytes32);
 
             if (restoreBtn) restoreBtn.textContent = 'Confirming...';
