@@ -405,41 +405,7 @@
     var orderSubTab = 'buyer';
     var orderPage = 1;
 
-    // ─── Init ────────────────────────────────────────────────────────
-    // Re-init on bfcache restore (Brave/Safari back-forward cache)
-    window.addEventListener('pageshow', function(e) {
-        if (e.persisted && !catalogItems.length) loadSellersAndCatalog();
-    });
-
-    (function init() {
-        var params = new URLSearchParams(window.location.search);
-        var override = params.get('marketplaceApi') || params.get('api');
-        if (override) apiBase = override.replace(/\/+$/, '');
-
-        var sel = document.getElementById('endpointSelect');
-        // Set dropdown to match current apiBase if it matches an option
-        for (var i = 0; i < sel.options.length; i++) {
-            if (sel.options[i].value === apiBase) { sel.selectedIndex = i; break; }
-        }
-        document.getElementById('apiUrlDisplay').textContent = apiBase;
-
-        sel.addEventListener('change', function() {
-            apiBase = this.value;
-            document.getElementById('apiUrlDisplay').textContent = apiBase;
-            // Reset and reload
-            authToken = null; authAddress = null; signer = null; provider = null;
-            document.getElementById('walletStatus').style.display = 'none';
-            document.getElementById('walletDot').classList.remove('connected');
-            document.getElementById('walletText').textContent = '';
-            catalogItems = []; catalogCursor = null; sellersList = [];
-            loadSellersAndCatalog();
-            renderInventoryForm();
-        });
-
-        buildTabs();
-        renderInventoryForm();
-        loadSellersAndCatalog();
-    })();
+    // ─── Init (hoisted — actual call is at end of script) ─────────
 
     // ─── DOM helper ──────────────────────────────────────────────────
     function el(tag, attrs, children) {
@@ -1140,6 +1106,39 @@
             showError(resultDiv, 'Inventory check failed: ' + err.message);
         }
     }
+
+    // ─── Init (runs after all declarations) ──────────────────────────
+    window.addEventListener('pageshow', function(e) {
+        if (e.persisted && !catalogItems.length) loadSellersAndCatalog();
+    });
+
+    (function init() {
+        var params = new URLSearchParams(window.location.search);
+        var override = params.get('marketplaceApi') || params.get('api');
+        if (override) apiBase = override.replace(/\/+$/, '');
+
+        var sel = document.getElementById('endpointSelect');
+        for (var i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value === apiBase) { sel.selectedIndex = i; break; }
+        }
+        document.getElementById('apiUrlDisplay').textContent = apiBase;
+
+        sel.addEventListener('change', function() {
+            apiBase = this.value;
+            document.getElementById('apiUrlDisplay').textContent = apiBase;
+            authToken = null; authAddress = null; signer = null; provider = null;
+            document.getElementById('walletStatus').style.display = 'none';
+            document.getElementById('walletDot').classList.remove('connected');
+            document.getElementById('walletText').textContent = '';
+            catalogItems = []; catalogCursor = null; sellersList = []; sellerInfoCache = {};
+            loadSellersAndCatalog();
+            renderInventoryForm();
+        });
+
+        buildTabs();
+        renderInventoryForm();
+        loadSellersAndCatalog();
+    })();
     </script>
 </body>
 </html>
