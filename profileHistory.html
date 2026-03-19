@@ -542,7 +542,21 @@
             ]);
 
             if (profile.status === 'fulfilled' && profile.value) {
-                renderProfileCard(profile.value, addr);
+                var profileData = profile.value;
+                var profileCid = profileData.CID || profileData.cidV0 || profileData.cid;
+                renderProfileCard(profileData, addr);
+                // Async-fetch CID content to get avatar image (not in /profile response)
+                if (profileCid) {
+                    fetchCidContent(profileCid).then(function(cidData) {
+                        var imgUrl = cidData.previewImageUrl || cidData.imageUrl || '';
+                        if (imgUrl) {
+                            var avatarEl = document.getElementById('profileAvatar');
+                            var placeholderEl = document.getElementById('profileAvatarPlaceholder');
+                            if (avatarEl) { avatarEl.src = imgUrl; avatarEl.style.display = ''; }
+                            if (placeholderEl) placeholderEl.style.display = 'none';
+                        }
+                    }).catch(function() {});
+                }
             }
 
             if (history.status === 'fulfilled') {
@@ -594,18 +608,17 @@
 
         var card = el('div', {className: 'profile-card'});
 
-        // Avatar
-        if (avatarUrl) {
-            var img = el('img', {className: 'profile-avatar', alt: 'avatar'});
-            img.src = avatarUrl;
-            img.onerror = function() { this.style.display = 'none'; };
-            card.appendChild(img);
-        } else {
-            var placeholder = el('div', {className: 'profile-avatar',
-                style: 'display:flex;align-items:center;justify-content:center;font-size:1.5rem;color:var(--text-muted);'});
-            placeholder.appendChild(el('i', {className: 'fas fa-user'}));
-            card.appendChild(placeholder);
-        }
+        // Avatar — img hidden until src is set (async from CID content)
+        var img = el('img', {className: 'profile-avatar', id: 'profileAvatar', alt: 'avatar'});
+        img.style.display = avatarUrl ? '' : 'none';
+        if (avatarUrl) img.src = avatarUrl;
+        img.onerror = function() { this.style.display = 'none'; };
+
+        var placeholder = el('div', {className: 'profile-avatar', id: 'profileAvatarPlaceholder',
+            style: 'display:' + (avatarUrl ? 'none' : 'flex') + ';align-items:center;justify-content:center;font-size:1.5rem;color:var(--text-muted);'});
+        placeholder.appendChild(el('i', {className: 'fas fa-user'}));
+        card.appendChild(img);
+        card.appendChild(placeholder);
 
         var info = el('div', {className: 'profile-info'});
         info.appendChild(el('h2', {}, name));

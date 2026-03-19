@@ -558,28 +558,37 @@
         var grid = el('div', {className: 'card-grid'});
 
         catalogItems.forEach(function(item) {
+            // Catalog items use nested schema.org structure: item.product.name, etc.
+            var p = item.product || item;
+            var offer = (p.offers && p.offers[0]) || {};
             var card = el('div', {className: 'product-card'});
 
-            var imgUrl = item.imageUrl || item.image || '';
+            // Image: product.image is an array of URLs
+            var imgUrl = '';
+            if (Array.isArray(p.image) && p.image.length) imgUrl = p.image[0];
+            else if (typeof p.image === 'string') imgUrl = p.image;
+            else imgUrl = p.imageUrl || '';
             if (imgUrl) {
-                var img = el('img', {className: 'product-img', alt: item.name || 'Product'});
+                var img = el('img', {className: 'product-img', alt: p.name || 'Product'});
                 img.src = imgUrl;
                 img.onerror = function() { this.style.display = 'none'; };
                 card.appendChild(img);
             }
 
-            card.appendChild(el('h3', {}, item.name || item.title || 'Unnamed'));
+            card.appendChild(el('h3', {}, p.name || p.title || 'Unnamed'));
 
-            if (item.description) {
-                var desc = item.description.length > 100 ? item.description.slice(0, 100) + '...' : item.description;
+            if (p.description) {
+                var desc = p.description.length > 100 ? p.description.slice(0, 100) + '...' : p.description;
                 card.appendChild(el('p', {className: 'meta'}, desc));
             }
 
-            var priceStr = item.price != null ? String(item.price) : 'N/A';
-            if (item.currency) priceStr += ' ' + item.currency;
+            var price = offer.price != null ? offer.price : p.price;
+            var currency = offer.priceCurrency || p.currency || '';
+            var priceStr = price != null ? String(price) : 'N/A';
+            if (currency) priceStr += ' ' + currency;
             card.appendChild(el('div', {className: 'price'}, priceStr));
 
-            var sellerAddr = item.seller || item.sellerAddress || '';
+            var sellerAddr = item.seller || p.seller || '';
             if (sellerAddr) {
                 var sellerRow = el('div', {className: 'meta', style: 'margin-top:4px;'});
                 sellerRow.appendChild(document.createTextNode('Seller: '));
@@ -592,8 +601,9 @@
                 card.appendChild(sellerRow);
             }
 
-            if (item.sku) {
-                card.appendChild(el('div', {className: 'meta'}, 'SKU: ' + item.sku));
+            var sku = p.sku || item.sku || '';
+            if (sku) {
+                card.appendChild(el('div', {className: 'meta'}, 'SKU: ' + sku));
             }
 
             grid.appendChild(card);
