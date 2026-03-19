@@ -300,7 +300,11 @@
     <div class="container">
         <div class="api-config">
             <i class="fas fa-server"></i>
-            API: <code id="apiUrlDisplay"></code>
+            <select id="endpointSelect" style="padding:4px 8px;border:1px solid var(--border);border-radius:4px;font-family:inherit;font-size:0.85rem;">
+                <option value="https://rpc.aboutcircles.com/profiles">Production</option>
+                <option value="https://staging.aboutcircles.com/profiles">Staging</option>
+            </select>
+            <code id="apiUrlDisplay"></code>
         </div>
 
         <div class="input-row">
@@ -331,14 +335,22 @@
 
     // Allow override via ?pinningApi= or ?api= query param
     (function initConfig() {
-        const params = new URLSearchParams(window.location.search);
-        const override = params.get('pinningApi') || params.get('api');
-        if (override) {
-            apiBase = override.replace(/\/+$/, '');
+        var params = new URLSearchParams(window.location.search);
+        var override = params.get('pinningApi') || params.get('api');
+        if (override) apiBase = override.replace(/\/+$/, '');
+
+        var sel = document.getElementById('endpointSelect');
+        for (var i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value === apiBase) { sel.selectedIndex = i; break; }
         }
         document.getElementById('apiUrlDisplay').textContent = apiBase;
 
-        const addr = params.get('address');
+        sel.addEventListener('change', function() {
+            apiBase = this.value;
+            document.getElementById('apiUrlDisplay').textContent = apiBase;
+        });
+
+        var addr = params.get('address');
         if (addr) {
             document.getElementById('addressInput').value = addr;
             setTimeout(function() { checkHistory(); }, 50);
