@@ -386,9 +386,6 @@
             <div id="ordersContent"></div>
         </div>
 
-        <div class="tab-content" id="tab-inventory">
-            <div id="inventoryContent"></div>
-        </div>
     </div>
 
     <script>
@@ -457,8 +454,7 @@
         {id: 'catalog', label: 'Catalog', icon: 'fa-boxes-stacked'},
         {id: 'sellers', label: 'Sellers', icon: 'fa-users'},
         {id: 'payments', label: 'Payments', icon: 'fa-credit-card'},
-        {id: 'orders', label: 'Orders', icon: 'fa-receipt', auth: true},
-        {id: 'inventory', label: 'Inventory', icon: 'fa-warehouse'}
+        {id: 'orders', label: 'Orders', icon: 'fa-receipt', auth: true}
     ];
 
     function buildTabs() {
@@ -676,16 +672,7 @@
                 })(sellerLine, sellerLink, sellerAddr);
             }
             if (sku) {
-                var skuLine = el('div', {style: 'display:flex;align-items:center;gap:4px;'});
-                skuLine.appendChild(document.createTextNode(sku));
-                if (sellerAddr) {
-                    var stockLink = el('a', {href: '#', style: 'color:var(--primary);text-decoration:none;margin-left:auto;',
-                        onClick: (function(s, a) { return function(e) { e.preventDefault(); checkInventoryFor(a, s); }; })(sku, sellerAddr)});
-                    stockLink.appendChild(el('i', {className: 'fas fa-warehouse', style: 'margin-right:3px;font-size:0.75em;'}));
-                    stockLink.appendChild(document.createTextNode('stock'));
-                    skuLine.appendChild(stockLink);
-                }
-                metaBottom.appendChild(skuLine);
+                metaBottom.appendChild(el('div', {style: 'font-family:monospace;font-size:0.8rem;'}, sku));
             }
             card.appendChild(metaBottom);
 
@@ -1060,7 +1047,7 @@
 
         var stats = el('div', {style: 'display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap;'});
         [['Payments', allPayments.length], ['Volume', totalVolume.toFixed(2) + ' CRC'],
-         ['Unique Payers', Object.keys(uniquePayers).length], ['Unique Payees', Object.keys(uniquePayees).length]
+         ['Buyers', Object.keys(uniquePayers).length], ['Sellers', Object.keys(uniquePayees).length]
         ].forEach(function(s) {
             var card = el('div', {style: 'background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:12px 16px;min-width:120px;'});
             card.appendChild(el('div', {style: 'font-size:0.8rem;color:var(--text-muted);'}, s[0]));
@@ -1233,48 +1220,6 @@
     // Used by sellers table → payments, catalog → seller filter, etc.
     function viewSellerPayments(addr) { filterPaymentsBySeller(addr); }
 
-    // ─── Inventory ───────────────────────────────────────────────────
-    function checkInventoryFor(seller, sku) {
-        switchTab('inventory');
-        setTimeout(function() {
-            var sellerEl = document.getElementById('invSeller');
-            var skuEl = document.getElementById('invSku');
-            if (sellerEl) sellerEl.value = seller;
-            if (skuEl) skuEl.value = sku;
-            checkInventory();
-        }, 50);
-    }
-
-    function renderInventoryForm() {
-        var container = clearEl('inventoryContent');
-
-        var form = el('div');
-        var row = el('div', {className: 'form-row'});
-
-        var chainGroup = el('div', {className: 'form-group'});
-        chainGroup.appendChild(el('label', {}, 'Chain ID'));
-        chainGroup.appendChild(el('input', {type: 'text', id: 'invChainId', value: '100', style: 'width:80px;'}));
-        row.appendChild(chainGroup);
-
-        var sellerGroup = el('div', {className: 'form-group', style: 'flex:1;'});
-        sellerGroup.appendChild(el('label', {}, 'Seller Address'));
-        sellerGroup.appendChild(el('input', {type: 'text', id: 'invSeller', placeholder: '0x...'}));
-        row.appendChild(sellerGroup);
-
-        var skuGroup = el('div', {className: 'form-group'});
-        skuGroup.appendChild(el('label', {}, 'SKU'));
-        skuGroup.appendChild(el('input', {type: 'text', id: 'invSku', placeholder: 'Product SKU'}));
-        row.appendChild(skuGroup);
-
-        var btnGroup = el('div', {className: 'form-group'});
-        btnGroup.appendChild(el('label', {}, '\u00A0'));
-        btnGroup.appendChild(el('button', {className: 'btn', onClick: checkInventory}, 'Check'));
-        row.appendChild(btnGroup);
-
-        form.appendChild(row);
-        container.appendChild(form);
-        container.appendChild(el('div', {id: 'inventoryResult'}));
-    }
 
     // ─── SIWE Auth ───────────────────────────────────────────────────
     async function connectWallet() {
@@ -1525,53 +1470,6 @@
         }
     }
 
-    async function checkInventory() {
-        var chainId = document.getElementById('invChainId').value.trim() || '100';
-        var seller = document.getElementById('invSeller').value.trim();
-        var sku = document.getElementById('invSku').value.trim();
-
-        if (!seller || !sku) {
-            showError(document.getElementById('inventoryResult'), 'Please enter seller address and SKU.');
-            return;
-        }
-
-        var resultDiv = clearEl('inventoryResult');
-        showLoading(resultDiv);
-
-        try {
-            var [avail, inv] = await Promise.allSettled([
-                fetch(apiBase + '/inventory/availability/' + chainId + '/' + seller + '/' + encodeURIComponent(sku)).then(function(r) { return r.ok ? r.json() : null; }),
-                fetch(apiBase + '/inventory/inventory/' + chainId + '/' + seller + '/' + encodeURIComponent(sku)).then(function(r) { return r.ok ? r.json() : null; })
-            ]);
-
-            resultDiv.textContent = '';
-            var card = el('div', {className: 'product-card', style: 'max-width:400px;'});
-
-            card.appendChild(el('h3', {}, 'Inventory for SKU: ' + sku));
-
-            if (avail.status === 'fulfilled' && avail.value != null) {
-                var availVal = typeof avail.value === 'object' ? JSON.stringify(avail.value) : String(avail.value);
-                card.appendChild(el('div', {}, [
-                    el('strong', {}, 'Availability: '),
-                    document.createTextNode(availVal)
-                ]));
-            }
-            if (inv.status === 'fulfilled' && inv.value != null) {
-                var invVal = typeof inv.value === 'object' ? JSON.stringify(inv.value, null, 2) : String(inv.value);
-                card.appendChild(el('div', {style: 'margin-top:8px;'}, [
-                    el('strong', {}, 'Inventory Details:'),
-                    el('pre', {style: 'margin-top:4px;font-size:0.85rem;white-space:pre-wrap;'}, invVal)
-                ]));
-            }
-            if ((!avail.value && avail.status === 'fulfilled') && (!inv.value && inv.status === 'fulfilled')) {
-                card.appendChild(el('div', {className: 'meta'}, 'No inventory data found for this combination.'));
-            }
-
-            resultDiv.appendChild(card);
-        } catch (err) {
-            showError(resultDiv, 'Inventory check failed: ' + err.message);
-        }
-    }
 
     // ─── Init (runs after all declarations) ──────────────────────────
     window.addEventListener('pageshow', function(e) {
@@ -1598,7 +1496,7 @@
             document.getElementById('walletText').textContent = '';
             catalogItems = []; catalogCursor = null; sellersList = []; sellerInfoCache = {};
             loadSellersAndCatalog();
-            renderInventoryForm();
+
         });
 
         // Restore state from URL
