@@ -193,10 +193,15 @@
             background: #f0eef9;
             padding: 2px 8px;
             border-radius: 3px;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
+            display: inline-block;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            cursor: pointer;
+            text-decoration: none;
         }
+        .timeline-cid:hover { color: var(--accent); }
         .timeline-actions {
             display: flex;
             gap: 6px;
@@ -599,7 +604,7 @@
         var cidLine = el('div', {className: 'cid-line'});
         var cidLink = el('a', {href: '#', className: 'cid-inspect-link', title: 'Inspect CID content',
             onClick: function(e) { e.preventDefault(); inspectCid(cid, 'Current profile'); }});
-        cidLink.textContent = 'CID: ' + truncateCid(cid);
+        cidLink.textContent = 'CID: ' + cid;
         cidLine.appendChild(cidLink);
         var copyBtn = el('button', {className: 'copy-btn', title: 'Copy CID',
             onClick: function() { copyText(cid); }});
@@ -671,8 +676,14 @@
                 meta.appendChild(el('span', {}, '#' + (idx + 1)));
             }
             var metaRight = el('span');
-            if (block) metaRight.appendChild(document.createTextNode('\u25A2 ' + block + '  '));
-            if (timestamp) metaRight.appendChild(document.createTextNode('\u23F0 ' + timestamp));
+            if (block) {
+                metaRight.appendChild(el('i', {className: 'fas fa-cube', style: 'margin-right:3px;font-size:0.8em;'}));
+                metaRight.appendChild(document.createTextNode(block + '  '));
+            }
+            if (timestamp) {
+                metaRight.appendChild(el('i', {className: 'fas fa-clock', style: 'margin-right:3px;font-size:0.8em;'}));
+                metaRight.appendChild(document.createTextNode(timestamp));
+            }
             meta.appendChild(metaRight);
             card.appendChild(meta);
 
@@ -687,7 +698,7 @@
 
             var cidLink = el('a', {href: '#', className: 'timeline-cid', title: 'Inspect CID content',
                 style: 'cursor:pointer;text-decoration:none;'});
-            cidLink.textContent = truncateCid(cid);
+            cidLink.textContent = cid;
             cidLink.addEventListener('click', (function(i) {
                 return function(e) { e.preventDefault(); e.stopPropagation(); viewEntry(i); };
             })(idx));
