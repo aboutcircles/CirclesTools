@@ -709,7 +709,27 @@
                 })(sellerLine, sellerLink, sellerAddr);
             }
             if (sku) {
-                metaBottom.appendChild(el('div', {style: 'font-family:monospace;font-size:0.8rem;'}, sku));
+                var skuLine = el('div', {style: 'display:flex;align-items:center;gap:6px;font-size:0.8rem;'});
+                skuLine.appendChild(el('span', {style: 'font-family:monospace;'}, sku));
+                // Availability badge (silent — shows only if feed works)
+                var availUrl = offer.availabilityFeed || null;
+                if (availUrl) {
+                    var badge = el('span', {style: 'margin-left:auto;'});
+                    skuLine.appendChild(badge);
+                    (function(b, url) {
+                        fetch(url).then(function(r) { return r.ok ? r.json() : null; }).then(function(data) {
+                            if (!data) return;
+                            var qty = data.available != null ? data.available : (data.quantity != null ? data.quantity : (data.inStock != null ? data.inStock : null));
+                            if (qty === true || (typeof qty === 'number' && qty > 0)) {
+                                b.appendChild(el('span', {style: 'font-size:0.7rem;padding:1px 6px;border-radius:8px;background:#dcfce7;color:#166534;'},
+                                    typeof qty === 'number' ? qty + ' avail' : 'In stock'));
+                            } else if (qty === false || qty === 0) {
+                                b.appendChild(el('span', {style: 'font-size:0.7rem;padding:1px 6px;border-radius:8px;background:#fee2e2;color:#991b1b;'}, 'Out of stock'));
+                            }
+                        }).catch(function() {});
+                    })(badge, availUrl);
+                }
+                metaBottom.appendChild(skuLine);
             }
             card.appendChild(metaBottom);
 
@@ -747,11 +767,14 @@
             var chain = seller.chainId || '100';
             var card = el('div', {className: 'product-card', id: 'seller-' + addr.toLowerCase()});
 
-            // Header: name + type badge (async)
-            var nameRow = el('div', {style: 'display:flex;align-items:center;gap:8px;margin-bottom:4px;'});
+            // Header: avatar + name + type badge
+            var headerRow = el('div', {style: 'display:flex;align-items:center;gap:10px;margin-bottom:4px;'});
+            var avatarImg = el('img', {style: 'width:36px;height:36px;border-radius:50%;object-fit:cover;background:var(--border);display:none;'});
+            avatarImg.id = 'seller-avatar-' + addr.toLowerCase();
+            headerRow.appendChild(avatarImg);
             var nameEl = el('h3', {style: 'margin:0;'}, 'Loading...');
-            nameRow.appendChild(nameEl);
-            card.appendChild(nameRow);
+            headerRow.appendChild(nameEl);
+            card.appendChild(headerRow);
 
             // Address row
             var addrRow = el('div', {className: 'meta', style: 'font-family:monospace;display:flex;align-items:center;gap:4px;'});
@@ -793,7 +816,7 @@
 
             card.appendChild(actions);
 
-            // Async enrich name + type
+            // Async enrich name + type + avatar
             (function(ne, addr) {
                 enrichSeller(addr).then(function(info) {
                     ne.textContent = info.name || truncAddr(addr);
@@ -806,6 +829,11 @@
                                  'background:#f3f4f6;color:#374151;')
                         }, info.type);
                         ne.appendChild(badge);
+                    }
+                    // Show avatar if available
+                    if (info.imageUrl) {
+                        var av = document.getElementById('seller-avatar-' + addr.toLowerCase());
+                        if (av) { av.src = info.imageUrl; av.style.display = ''; }
                     }
                 });
             })(nameEl, addr);
@@ -885,17 +913,32 @@
 
         var info = { name: null, type: null };
 
-        // Profile name from pinning service
+        // Profile name + CID from pinning service
+        var profileCid = null;
         try {
             var res = await fetch(PROFILES_API + '/search?address=' + key);
             if (res.ok) {
                 var data = await res.json();
                 if (Array.isArray(data)) {
                     var profile = data.find(function(p) { return p.address && p.address.toLowerCase() === key; });
-                    if (profile) info.name = profile.name || null;
+                    if (profile) {
+                        info.name = profile.name || null;
+                        profileCid = profile.CID || null;
+                    }
                 }
             }
         } catch (e) {}
+
+        // Fetch CID content for profile image (non-blocking for cache)
+        if (profileCid) {
+            try {
+                var cidRes = await fetch(PROFILES_API + '/get?cid=' + profileCid);
+                if (cidRes.ok) {
+                    var cidData = await cidRes.json();
+                    info.imageUrl = cidData.previewImageUrl || cidData.imageUrl || null;
+                }
+            } catch (e) {}
+        }
 
         // On-chain type from Circles RPC (structured DTO, not raw SQL)
         try {
