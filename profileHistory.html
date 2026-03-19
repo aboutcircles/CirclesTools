@@ -279,6 +279,13 @@
             transition: color 0.2s;
         }
         .copy-btn:hover { color: var(--primary); }
+        .cid-inspect-link {
+            color: var(--primary);
+            text-decoration: underline;
+            text-decoration-style: dotted;
+            cursor: pointer;
+        }
+        .cid-inspect-link:hover { text-decoration-style: solid; color: var(--accent); }
 
         @media (max-width: 600px) {
             .diff-container { grid-template-columns: 1fr; }
@@ -466,6 +473,7 @@
                 hasMore = entries.length >= PAGE_SIZE;
                 offset = entries.length;
                 renderTimeline();
+                if (entries.length > 0) viewEntry(0);
             } else {
                 timelineSection.textContent = '';
                 timelineSection.appendChild(el('div', {className: 'error-msg'},
@@ -504,7 +512,7 @@
 
         var name = profile.name || profile.username || 'Unknown';
         var avatarUrl = profile.previewImageUrl || profile.avatarUrl || '';
-        var cid = profile.cidV0 || profile.cid || 'N/A';
+        var cid = profile.CID || profile.cidV0 || profile.cid || 'N/A';
 
         var card = el('div', {className: 'profile-card'});
 
@@ -525,7 +533,10 @@
         info.appendChild(el('h2', {}, name));
 
         var cidLine = el('div', {className: 'cid-line'});
-        cidLine.appendChild(el('span', {}, 'CID: ' + truncateCid(cid)));
+        var cidLink = el('a', {href: '#', className: 'cid-inspect-link', title: 'Inspect CID content',
+            onClick: function(e) { e.preventDefault(); inspectCid(cid, 'Current profile'); }});
+        cidLink.textContent = 'CID: ' + truncateCid(cid);
+        cidLine.appendChild(cidLink);
         var copyBtn = el('button', {className: 'copy-btn', title: 'Copy CID',
             onClick: function() { copyText(cid); }});
         copyBtn.appendChild(el('i', {className: 'fas fa-copy'}));
@@ -610,15 +621,19 @@
             cb.addEventListener('click', function(e) { e.stopPropagation(); });
             cidRow.appendChild(cb);
 
-            var cidSpan = el('span', {className: 'timeline-cid'}, truncateCid(cid));
-            var cpBtn = el('button', {className: 'copy-btn', title: 'Copy CID'});
+            var cidLink = el('a', {href: '#', className: 'timeline-cid', title: 'Inspect CID content',
+                style: 'cursor:pointer;text-decoration:none;'});
+            cidLink.textContent = truncateCid(cid);
+            cidLink.addEventListener('click', (function(i) {
+                return function(e) { e.preventDefault(); e.stopPropagation(); viewEntry(i); };
+            })(idx));
+            cidRow.appendChild(cidLink);
+            var cpBtn = el('button', {className: 'copy-btn', title: 'Copy full CID'});
             cpBtn.addEventListener('click', (function(c) {
                 return function(e) { e.stopPropagation(); copyText(c); };
             })(cid));
             cpBtn.appendChild(el('i', {className: 'fas fa-copy'}));
-            cidSpan.appendChild(document.createTextNode(' '));
-            cidSpan.appendChild(cpBtn);
-            cidRow.appendChild(cidSpan);
+            cidRow.appendChild(cpBtn);
             card.appendChild(cidRow);
 
             te.appendChild(card);
@@ -634,6 +649,36 @@
             lmBtn.appendChild(document.createTextNode(' Load More'));
             loadMoreRow.appendChild(lmBtn);
             section.appendChild(loadMoreRow);
+        }
+    }
+
+    async function inspectCid(cid, label) {
+        var detailSection = document.getElementById('detailSection');
+        detailSection.textContent = '';
+
+        var panel = el('div', {className: 'detail-panel'});
+        var header = el('div', {className: 'detail-header'});
+        header.appendChild(el('span', {}, (label || 'CID') + ': ' + cid));
+        var copyHdr = el('button', {className: 'copy-btn', title: 'Copy full CID',
+            onClick: function() { copyText(cid); }});
+        copyHdr.appendChild(el('i', {className: 'fas fa-copy'}));
+        copyHdr.appendChild(document.createTextNode(' Copy'));
+        header.appendChild(copyHdr);
+        panel.appendChild(header);
+
+        var body = el('div', {className: 'detail-body'});
+        body.appendChild(el('span', {className: 'loader'}));
+        body.appendChild(document.createTextNode(' Loading...'));
+        panel.appendChild(body);
+        detailSection.appendChild(panel);
+
+        try {
+            var content = await fetchCidContent(cid);
+            body.textContent = '';
+            body.appendChild(el('pre', {}, JSON.stringify(content, null, 2)));
+        } catch (err) {
+            body.textContent = '';
+            body.appendChild(el('div', {className: 'error-msg'}, 'Failed to load: ' + err.message));
         }
     }
 
