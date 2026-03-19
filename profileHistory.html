@@ -1,0 +1,806 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Profile CID History</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
+    <style>
+        :root {
+            --primary: #191568;
+            --accent: #ff491b;
+            --bg: #fff7f5;
+            --card-bg: #ffffff;
+            --border: #e5e3fb;
+            --text: #191568;
+            --text-muted: #666;
+            --success: #22c55e;
+            --error: #ef4444;
+        }
+        * { box-sizing: border-box; margin: 0; }
+        body {
+            font-family: "DM Sans", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+        }
+        header {
+            background: var(--primary);
+            color: #fff;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        header h1 { margin: 0; font-weight: 600; font-size: 1.3rem; }
+        .header-links a {
+            color: rgba(255,255,255,0.8);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+        .header-links a:hover { color: #fff; }
+        .container {
+            max-width: 960px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+        .input-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .input-row input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 1rem;
+            font-family: inherit;
+        }
+        .input-row input:focus { outline: 2px solid var(--primary); border-color: transparent; }
+        .btn {
+            padding: 10px 20px;
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            font-family: inherit;
+            white-space: nowrap;
+            transition: background 0.2s;
+        }
+        .btn:hover { background: #251b9f; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-sm {
+            padding: 5px 12px;
+            font-size: 0.85rem;
+            border-radius: 4px;
+        }
+        .btn-outline {
+            background: transparent;
+            color: var(--primary);
+            border: 1px solid var(--border);
+        }
+        .btn-outline:hover { background: var(--border); }
+        .btn-accent { background: var(--accent); }
+        .btn-accent:hover { background: #e0400f; }
+
+        .api-config {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .api-config code {
+            background: #f0eef9;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.8rem;
+        }
+
+        /* Current profile card */
+        .profile-card {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 24px;
+        }
+        .profile-avatar {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            object-fit: cover;
+            background: var(--border);
+            flex-shrink: 0;
+        }
+        .profile-info h2 { font-size: 1.15rem; margin-bottom: 4px; }
+        .profile-info .cid-line {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-family: monospace;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Timeline */
+        .timeline { position: relative; padding-left: 28px; margin-top: 16px; }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 8px;
+            top: 8px;
+            bottom: 8px;
+            width: 2px;
+            background: var(--border);
+        }
+        .timeline-entry {
+            position: relative;
+            margin-bottom: 12px;
+            cursor: pointer;
+        }
+        .timeline-dot {
+            position: absolute;
+            left: -22px;
+            top: 10px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ccc;
+            border: 2px solid var(--bg);
+        }
+        .timeline-entry:first-child .timeline-dot { background: var(--success); }
+        .timeline-entry.selected .timeline-dot { background: var(--accent); }
+
+        .timeline-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 14px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .timeline-entry:hover .timeline-card { border-color: var(--primary); }
+        .timeline-entry.selected .timeline-card {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(255,73,27,0.15);
+        }
+        .timeline-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 6px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        .timeline-cid {
+            font-family: monospace;
+            font-size: 0.82rem;
+            color: var(--text);
+            background: #f0eef9;
+            padding: 2px 8px;
+            border-radius: 3px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .timeline-actions {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
+        }
+        .diff-select {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+
+        /* Detail panel */
+        .detail-panel {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-top: 24px;
+            overflow: hidden;
+        }
+        .detail-header {
+            padding: 12px 16px;
+            background: #f0eef9;
+            font-weight: 600;
+            font-size: 0.95rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .detail-body {
+            padding: 16px;
+            max-height: 500px;
+            overflow: auto;
+        }
+        .detail-body pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+
+        /* Diff view */
+        .diff-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .diff-side { min-width: 0; }
+        .diff-side h3 { font-size: 0.9rem; margin-bottom: 8px; color: var(--text-muted); }
+        .diff-line { font-size: 0.85rem; padding: 1px 4px; border-radius: 2px; font-family: monospace; }
+        .diff-added { background: #dcfce7; }
+        .diff-removed { background: #fee2e2; }
+        .diff-unchanged { color: var(--text-muted); }
+
+        /* Loading & error */
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 0.8s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-left: 8px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .error-msg { color: var(--error); padding: 12px; background: #fef2f2; border-radius: 6px; margin: 10px 0; }
+        .empty-state { text-align: center; color: var(--text-muted); padding: 40px 20px; }
+
+        .load-more-row { text-align: center; margin: 16px 0; }
+        .copy-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            padding: 2px;
+            transition: color 0.2s;
+        }
+        .copy-btn:hover { color: var(--primary); }
+
+        @media (max-width: 600px) {
+            .diff-container { grid-template-columns: 1fr; }
+            .input-row { flex-direction: column; }
+        }
+    </style>
+    <script defer data-domain="aboutcircles.github.io/circlestools" src="https://plausible.io/js/script.js"></script>
+</head>
+<body>
+    <header>
+        <div>
+            <h1><i class="fas fa-clock-rotate-left" style="margin-right: 8px;"></i>Profile CID History</h1>
+        </div>
+        <div class="header-links">
+            <a href="index.html"><i class="fas fa-home"></i> Tools</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="api-config">
+            <i class="fas fa-server"></i>
+            API: <code id="apiUrlDisplay"></code>
+        </div>
+
+        <div class="input-row">
+            <input type="text" id="addressInput" placeholder="0x... Circles address" />
+            <button class="btn" id="checkBtn" onclick="checkHistory()">
+                <i class="fas fa-search"></i> Check
+            </button>
+        </div>
+
+        <div id="profileSection" style="display:none;"></div>
+        <div id="timelineSection"></div>
+        <div id="detailSection"></div>
+    </div>
+
+    <script>
+    // ─── Configuration ───────────────────────────────────────────────
+    const DEFAULT_API = 'https://rpc.aboutcircles.com/profiles';
+    const FALLBACK_API = 'https://staging.aboutcircles.com/profiles';
+    const PAGE_SIZE = 50;
+
+    let apiBase = DEFAULT_API;
+    let historyEntries = [];
+    let selectedEntry = null;
+    let diffSelections = [];   // max 2 CID indices for diffing
+    let currentAddress = null;
+    let offset = 0;
+    let hasMore = true;
+
+    // Allow override via ?pinningApi= or ?api= query param
+    (function initConfig() {
+        const params = new URLSearchParams(window.location.search);
+        const override = params.get('pinningApi') || params.get('api');
+        if (override) {
+            apiBase = override.replace(/\/+$/, '');
+        }
+        document.getElementById('apiUrlDisplay').textContent = apiBase;
+
+        const addr = params.get('address');
+        if (addr) {
+            document.getElementById('addressInput').value = addr;
+            setTimeout(function() { checkHistory(); }, 50);
+        }
+    })();
+
+    // ─── Utility ─────────────────────────────────────────────────────
+    function truncateCid(cid) {
+        if (!cid || cid.length < 16) return cid || '';
+        return cid.slice(0, 8) + '...' + cid.slice(-6);
+    }
+
+    function escapeHtml(s) {
+        var d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    function formatTimestamp(ts) {
+        var d = typeof ts === 'number' ? new Date(ts < 1e12 ? ts * 1000 : ts) : new Date(ts);
+        if (isNaN(d.getTime())) return String(ts);
+        return d.toLocaleString();
+    }
+
+    function copyText(text) {
+        navigator.clipboard.writeText(text);
+    }
+
+    function el(tag, attrs, children) {
+        var e = document.createElement(tag);
+        if (attrs) Object.entries(attrs).forEach(function([k,v]) {
+            if (k === 'className') e.className = v;
+            else if (k === 'textContent') e.textContent = v;
+            else if (k.startsWith('on')) e.addEventListener(k.slice(2).toLowerCase(), v);
+            else e.setAttribute(k, v);
+        });
+        if (children) {
+            if (typeof children === 'string') e.textContent = children;
+            else if (Array.isArray(children)) children.forEach(function(c) { if (c) e.appendChild(c); });
+            else e.appendChild(children);
+        }
+        return e;
+    }
+
+    // ─── API helpers ─────────────────────────────────────────────────
+    async function fetchCurrentProfile(address) {
+        var res = await fetch(apiBase + '/api/profile/' + address);
+        if (!res.ok) throw new Error('Profile fetch failed: ' + res.status);
+        return res.json();
+    }
+
+    async function fetchCidHistory(address, limit, off) {
+        var res = await fetch(apiBase + '/api/avatar/' + address + '/history?limit=' + limit + '&offset=' + off);
+        if (!res.ok) throw new Error('History fetch failed: ' + res.status);
+        return res.json();
+    }
+
+    async function fetchCidContent(cid) {
+        var res = await fetch(apiBase + '/api/get?cid=' + encodeURIComponent(cid));
+        if (!res.ok) throw new Error('CID content fetch failed: ' + res.status);
+        return res.json();
+    }
+
+    // ─── Main flow ───────────────────────────────────────────────────
+    async function checkHistory() {
+        var addr = document.getElementById('addressInput').value.trim();
+        if (!addr || !/^0x[0-9a-fA-F]{40}$/.test(addr)) {
+            var errDiv = document.getElementById('timelineSection');
+            errDiv.textContent = '';
+            var errMsg = el('div', {className: 'error-msg'}, 'Please enter a valid Ethereum address.');
+            errDiv.appendChild(errMsg);
+            return;
+        }
+
+        currentAddress = addr;
+        offset = 0;
+        historyEntries = [];
+        diffSelections = [];
+        selectedEntry = null;
+        hasMore = true;
+
+        window.history.replaceState(null, '', '?address=' + addr +
+            (apiBase !== DEFAULT_API ? '&pinningApi=' + encodeURIComponent(apiBase) : ''));
+
+        var btn = document.getElementById('checkBtn');
+        btn.disabled = true;
+        btn.textContent = '';
+        btn.appendChild(el('span', {className: 'loader'}));
+        btn.appendChild(document.createTextNode(' Loading...'));
+
+        var profileSection = document.getElementById('profileSection');
+        var timelineSection = document.getElementById('timelineSection');
+        var detailSection = document.getElementById('detailSection');
+
+        profileSection.style.display = 'none';
+        profileSection.textContent = '';
+        timelineSection.textContent = '';
+        detailSection.textContent = '';
+
+        try {
+            var [profile, history] = await Promise.allSettled([
+                fetchCurrentProfile(addr),
+                fetchCidHistory(addr, PAGE_SIZE, 0)
+            ]);
+
+            if (profile.status === 'fulfilled' && profile.value) {
+                renderProfileCard(profile.value, addr);
+            }
+
+            if (history.status === 'fulfilled') {
+                var entries = Array.isArray(history.value) ? history.value : (history.value.history || []);
+                historyEntries = entries;
+                hasMore = entries.length >= PAGE_SIZE;
+                offset = entries.length;
+                renderTimeline();
+            } else {
+                timelineSection.textContent = '';
+                timelineSection.appendChild(el('div', {className: 'error-msg'},
+                    'Failed to load CID history. The profile may not exist in the pinning service.'));
+            }
+        } catch (err) {
+            timelineSection.textContent = '';
+            timelineSection.appendChild(el('div', {className: 'error-msg'}, err.message));
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '';
+            var icon = el('i', {className: 'fas fa-search'});
+            btn.appendChild(icon);
+            btn.appendChild(document.createTextNode(' Check'));
+        }
+    }
+
+    async function loadMore() {
+        if (!currentAddress || !hasMore) return;
+        try {
+            var result = await fetchCidHistory(currentAddress, PAGE_SIZE, offset);
+            var arr = Array.isArray(result) ? result : (result.history || []);
+            historyEntries = historyEntries.concat(arr);
+            hasMore = arr.length >= PAGE_SIZE;
+            offset += arr.length;
+            renderTimeline();
+        } catch (err) {
+            console.warn('Load more failed:', err);
+        }
+    }
+
+    // ─── Renderers (DOM-based) ───────────────────────────────────────
+    function renderProfileCard(profile, address) {
+        var section = document.getElementById('profileSection');
+        section.textContent = '';
+
+        var name = profile.name || profile.username || 'Unknown';
+        var avatarUrl = profile.previewImageUrl || profile.avatarUrl || '';
+        var cid = profile.cidV0 || profile.cid || 'N/A';
+
+        var card = el('div', {className: 'profile-card'});
+
+        // Avatar
+        if (avatarUrl) {
+            var img = el('img', {className: 'profile-avatar', alt: 'avatar'});
+            img.src = avatarUrl;
+            img.onerror = function() { this.style.display = 'none'; };
+            card.appendChild(img);
+        } else {
+            var placeholder = el('div', {className: 'profile-avatar',
+                style: 'display:flex;align-items:center;justify-content:center;font-size:1.5rem;color:var(--text-muted);'});
+            placeholder.appendChild(el('i', {className: 'fas fa-user'}));
+            card.appendChild(placeholder);
+        }
+
+        var info = el('div', {className: 'profile-info'});
+        info.appendChild(el('h2', {}, name));
+
+        var cidLine = el('div', {className: 'cid-line'});
+        cidLine.appendChild(el('span', {}, 'CID: ' + truncateCid(cid)));
+        var copyBtn = el('button', {className: 'copy-btn', title: 'Copy CID',
+            onClick: function() { copyText(cid); }});
+        copyBtn.appendChild(el('i', {className: 'fas fa-copy'}));
+        cidLine.appendChild(copyBtn);
+        info.appendChild(cidLine);
+
+        var linkRow = el('div', {style: 'margin-top:6px;'});
+        var profileLink = el('a', {
+            href: 'profileChecker.html?address=' + address,
+            className: 'btn btn-sm btn-outline',
+            style: 'text-decoration:none;display:inline-flex;align-items:center;gap:4px;'
+        });
+        profileLink.appendChild(el('i', {className: 'fas fa-user'}));
+        profileLink.appendChild(document.createTextNode(' On-chain Profile'));
+        linkRow.appendChild(profileLink);
+        info.appendChild(linkRow);
+
+        card.appendChild(info);
+        section.appendChild(card);
+        section.style.display = 'block';
+    }
+
+    function renderTimeline() {
+        var section = document.getElementById('timelineSection');
+        section.textContent = '';
+
+        if (!historyEntries.length) {
+            var empty = el('div', {className: 'empty-state'});
+            empty.appendChild(el('i', {className: 'fas fa-inbox', style: 'font-size:2rem;margin-bottom:8px;'}));
+            empty.appendChild(el('br'));
+            empty.appendChild(document.createTextNode('No CID history found for this address.'));
+            section.appendChild(empty);
+            return;
+        }
+
+        var heading = el('h3', {style: 'margin-bottom:12px;font-size:1rem;'},
+            'CID History (' + historyEntries.length + (hasMore ? '+' : '') + ' entries)');
+        section.appendChild(heading);
+
+        var btnRow = el('div', {style: 'margin-bottom:12px;'});
+        var diffBtn = el('button', {className: 'btn btn-sm btn-accent', id: 'diffBtn', disabled: 'true',
+            onClick: function() { showDiff(); }});
+        diffBtn.appendChild(el('i', {className: 'fas fa-code-compare'}));
+        diffBtn.appendChild(document.createTextNode(' Compare Selected (0/2)'));
+        btnRow.appendChild(diffBtn);
+        section.appendChild(btnRow);
+
+        var timeline = el('div', {className: 'timeline'});
+
+        historyEntries.forEach(function(entry, idx) {
+            var cid = entry.cid || entry.cidV0 || 'unknown';
+            var block = entry.blockNumber || entry.block || '';
+            var timestamp = entry.timestamp ? formatTimestamp(entry.timestamp) : '';
+            var isSelected = selectedEntry === idx;
+
+            var te = el('div', {className: 'timeline-entry' + (isSelected ? ' selected' : ''), 'data-idx': idx});
+            te.appendChild(el('div', {className: 'timeline-dot'}));
+
+            var card = el('div', {className: 'timeline-card'});
+            card.addEventListener('click', (function(i) { return function() { viewEntry(i); }; })(idx));
+
+            var meta = el('div', {className: 'timeline-meta'});
+            if (idx === 0) {
+                var s = el('span');
+                s.appendChild(el('strong', {}, 'Current'));
+                meta.appendChild(s);
+            } else {
+                meta.appendChild(el('span', {}, '#' + (idx + 1)));
+            }
+            var metaRight = el('span');
+            if (block) metaRight.appendChild(document.createTextNode('\u25A2 ' + block + '  '));
+            if (timestamp) metaRight.appendChild(document.createTextNode('\u23F0 ' + timestamp));
+            meta.appendChild(metaRight);
+            card.appendChild(meta);
+
+            var cidRow = el('div', {style: 'display:flex;align-items:center;gap:8px;'});
+            var cb = el('input', {type: 'checkbox', className: 'diff-select', 'data-idx': idx});
+            if (diffSelections.includes(idx)) cb.checked = true;
+            cb.addEventListener('change', (function(i) {
+                return function(e) { e.stopPropagation(); toggleDiffSelect(i, this); };
+            })(idx));
+            cb.addEventListener('click', function(e) { e.stopPropagation(); });
+            cidRow.appendChild(cb);
+
+            var cidSpan = el('span', {className: 'timeline-cid'}, truncateCid(cid));
+            var cpBtn = el('button', {className: 'copy-btn', title: 'Copy CID'});
+            cpBtn.addEventListener('click', (function(c) {
+                return function(e) { e.stopPropagation(); copyText(c); };
+            })(cid));
+            cpBtn.appendChild(el('i', {className: 'fas fa-copy'}));
+            cidSpan.appendChild(document.createTextNode(' '));
+            cidSpan.appendChild(cpBtn);
+            cidRow.appendChild(cidSpan);
+            card.appendChild(cidRow);
+
+            te.appendChild(card);
+            timeline.appendChild(te);
+        });
+
+        section.appendChild(timeline);
+
+        if (hasMore) {
+            var loadMoreRow = el('div', {className: 'load-more-row'});
+            var lmBtn = el('button', {className: 'btn btn-sm btn-outline', onClick: function() { loadMore(); }});
+            lmBtn.appendChild(el('i', {className: 'fas fa-chevron-down'}));
+            lmBtn.appendChild(document.createTextNode(' Load More'));
+            loadMoreRow.appendChild(lmBtn);
+            section.appendChild(loadMoreRow);
+        }
+    }
+
+    async function viewEntry(idx) {
+        selectedEntry = idx;
+        renderTimeline();
+
+        var entry = historyEntries[idx];
+        var cid = entry.cid || entry.cidV0 || '';
+        var detailSection = document.getElementById('detailSection');
+        detailSection.textContent = '';
+
+        var panel = el('div', {className: 'detail-panel'});
+        var header = el('div', {className: 'detail-header'});
+        header.appendChild(el('span', {}, 'Profile at CID: ' + truncateCid(cid)));
+        var copyHdr = el('button', {className: 'copy-btn', title: 'Copy full CID',
+            onClick: function() { copyText(cid); }});
+        copyHdr.appendChild(el('i', {className: 'fas fa-copy'}));
+        copyHdr.appendChild(document.createTextNode(' Copy CID'));
+        header.appendChild(copyHdr);
+        panel.appendChild(header);
+
+        var body = el('div', {className: 'detail-body'});
+        body.appendChild(el('span', {className: 'loader'}));
+        body.appendChild(document.createTextNode(' Loading...'));
+        panel.appendChild(body);
+        detailSection.appendChild(panel);
+
+        try {
+            var content = await fetchCidContent(cid);
+            body.textContent = '';
+            var pre = el('pre', {}, JSON.stringify(content, null, 2));
+            body.appendChild(pre);
+        } catch (err) {
+            body.textContent = '';
+            body.appendChild(el('div', {className: 'error-msg'}, 'Failed to load CID content: ' + err.message));
+        }
+    }
+
+    function toggleDiffSelect(idx, checkbox) {
+        if (checkbox.checked) {
+            if (diffSelections.length >= 2) {
+                diffSelections.shift();
+            }
+            diffSelections.push(idx);
+        } else {
+            diffSelections = diffSelections.filter(function(i) { return i !== idx; });
+        }
+
+        document.querySelectorAll('.diff-select').forEach(function(cb) {
+            cb.checked = diffSelections.includes(parseInt(cb.getAttribute('data-idx')));
+        });
+
+        var diffBtn = document.getElementById('diffBtn');
+        diffBtn.disabled = diffSelections.length !== 2;
+        diffBtn.textContent = '';
+        diffBtn.appendChild(el('i', {className: 'fas fa-code-compare'}));
+        diffBtn.appendChild(document.createTextNode(' Compare Selected (' + diffSelections.length + '/2)'));
+    }
+
+    async function showDiff() {
+        if (diffSelections.length !== 2) return;
+
+        var sorted = diffSelections.slice().sort(function(a, b) { return a - b; });
+        var idxA = sorted[0], idxB = sorted[1];
+        var entryA = historyEntries[idxA];
+        var entryB = historyEntries[idxB];
+        var cidA = entryA.cid || entryA.cidV0;
+        var cidB = entryB.cid || entryB.cidV0;
+
+        var detailSection = document.getElementById('detailSection');
+        detailSection.textContent = '';
+
+        var panel = el('div', {className: 'detail-panel'});
+        var header = el('div', {className: 'detail-header'});
+        header.appendChild(el('span', {}, 'Diff: #' + (idxA + 1) + ' vs #' + (idxB + 1)));
+        panel.appendChild(header);
+        var body = el('div', {className: 'detail-body'});
+        body.appendChild(el('span', {className: 'loader'}));
+        body.appendChild(document.createTextNode(' Loading both CIDs...'));
+        panel.appendChild(body);
+        detailSection.appendChild(panel);
+
+        try {
+            var [contentA, contentB] = await Promise.all([
+                fetchCidContent(cidA),
+                fetchCidContent(cidB)
+            ]);
+            renderDiff(contentA, contentB, cidA, cidB, idxA, idxB);
+        } catch (err) {
+            body.textContent = '';
+            body.appendChild(el('div', {className: 'error-msg'}, 'Diff failed: ' + err.message));
+        }
+    }
+
+    function renderDiff(objA, objB, cidA, cidB, idxA, idxB) {
+        // Recursive diff: walks nested objects/arrays and emits per-leaf lines
+        function diffLines(a, b, prefix) {
+            var lines = [];
+            if (a === b || JSON.stringify(a) === JSON.stringify(b)) {
+                // identical subtree — emit collapsed
+                lines.push({cls: 'diff-unchanged', textA: prefix + JSON.stringify(a), textB: prefix + JSON.stringify(b)});
+                return lines;
+            }
+            var aIsObj = a !== null && typeof a === 'object' && !Array.isArray(a);
+            var bIsObj = b !== null && typeof b === 'object' && !Array.isArray(b);
+            if (aIsObj && bIsObj) {
+                var keys = Array.from(new Set(Object.keys(a).concat(Object.keys(b)))).sort();
+                keys.forEach(function(k) {
+                    var childPrefix = prefix ? prefix + '.' + k : k;
+                    if (!(k in a)) {
+                        lines.push({cls: 'diff-added', textA: '', textB: childPrefix + ': ' + JSON.stringify(b[k])});
+                    } else if (!(k in b)) {
+                        lines.push({cls: 'diff-removed', textA: childPrefix + ': ' + JSON.stringify(a[k]), textB: ''});
+                    } else {
+                        lines = lines.concat(diffLines(a[k], b[k], childPrefix));
+                    }
+                });
+                return lines;
+            }
+            var aIsArr = Array.isArray(a);
+            var bIsArr = Array.isArray(b);
+            if (aIsArr && bIsArr) {
+                var maxLen = Math.max(a.length, b.length);
+                for (var i = 0; i < maxLen; i++) {
+                    var idxPrefix = prefix + '[' + i + ']';
+                    if (i >= a.length) {
+                        lines.push({cls: 'diff-added', textA: '', textB: idxPrefix + ': ' + JSON.stringify(b[i])});
+                    } else if (i >= b.length) {
+                        lines.push({cls: 'diff-removed', textA: idxPrefix + ': ' + JSON.stringify(a[i]), textB: ''});
+                    } else {
+                        lines = lines.concat(diffLines(a[i], b[i], idxPrefix));
+                    }
+                }
+                return lines;
+            }
+            // Leaf difference
+            lines.push({
+                cls: 'diff-changed',
+                textA: prefix + ': ' + JSON.stringify(a),
+                textB: prefix + ': ' + JSON.stringify(b)
+            });
+            return lines;
+        }
+
+        var lines = diffLines(objA || {}, objB || {}, '');
+
+        var detailSection = document.getElementById('detailSection');
+        detailSection.textContent = '';
+
+        var panel = el('div', {className: 'detail-panel'});
+        var header = el('div', {className: 'detail-header'});
+        header.appendChild(el('span', {}, 'Diff: #' + (idxA + 1) + ' vs #' + (idxB + 1)));
+        panel.appendChild(header);
+
+        var body = el('div', {className: 'detail-body'});
+        var container = el('div', {className: 'diff-container'});
+
+        var sideA = el('div', {className: 'diff-side'});
+        sideA.appendChild(el('h3', {}, '#' + (idxA + 1) + ' \u2014 ' + truncateCid(cidA)));
+        var sideB = el('div', {className: 'diff-side'});
+        sideB.appendChild(el('h3', {}, '#' + (idxB + 1) + ' \u2014 ' + truncateCid(cidB)));
+
+        lines.forEach(function(l) {
+            var lineA = el('div', {className: 'diff-line ' + (l.cls === 'diff-changed' ? 'diff-removed' : l.cls === 'diff-added' ? '' : l.cls)});
+            lineA.textContent = l.textA || '\u00A0';
+            sideA.appendChild(lineA);
+
+            var lineB = el('div', {className: 'diff-line ' + (l.cls === 'diff-changed' ? 'diff-added' : l.cls === 'diff-removed' ? '' : l.cls)});
+            lineB.textContent = l.textB || '\u00A0';
+            sideB.appendChild(lineB);
+        });
+
+        container.appendChild(sideA);
+        container.appendChild(sideB);
+        body.appendChild(container);
+        panel.appendChild(body);
+        detailSection.appendChild(panel);
+    }
+    </script>
+</body>
+</html>

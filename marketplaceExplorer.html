@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Marketplace Explorer</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
+    <style>
+        :root {
+            --primary: #191568;
+            --accent: #ff491b;
+            --bg: #fff7f5;
+            --card-bg: #ffffff;
+            --border: #e5e3fb;
+            --text: #191568;
+            --text-muted: #666;
+            --error: #ef4444;
+        }
+        * { box-sizing: border-box; margin: 0; }
+        body {
+            font-family: "DM Sans", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+        }
+        header {
+            background: var(--primary);
+            color: #fff;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        header h1 { margin: 0; font-weight: 600; font-size: 1.3rem; }
+        .header-links a {
+            color: rgba(255,255,255,0.8);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+        .header-links a:hover { color: #fff; }
+        .container {
+            max-width: 1100px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        .api-config {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .api-config code {
+            background: #f0eef9;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.8rem;
+        }
+
+        /* Tabs */
+        .tab-bar {
+            display: flex;
+            border-bottom: 2px solid var(--border);
+            margin-bottom: 20px;
+            gap: 4px;
+            overflow-x: auto;
+        }
+        .tab-btn {
+            padding: 10px 20px;
+            border: none;
+            background: transparent;
+            font-family: inherit;
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: color 0.2s, border-color 0.2s;
+            white-space: nowrap;
+        }
+        .tab-btn:hover { color: var(--text); }
+        .tab-btn.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+            font-weight: 600;
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 600;
+            font-family: inherit;
+            transition: background 0.2s;
+        }
+        .btn:hover { background: #251b9f; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-sm { padding: 6px 14px; font-size: 0.85rem; border-radius: 4px; }
+        .btn-outline { background: transparent; color: var(--primary); border: 1px solid var(--border); }
+        .btn-outline:hover { background: var(--border); }
+
+        /* Card grid */
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 16px;
+        }
+        .product-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: box-shadow 0.2s;
+        }
+        .product-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .product-card h3 { font-size: 1rem; margin: 0; }
+        .product-card .price {
+            font-weight: 600;
+            color: var(--accent);
+            font-size: 1.1rem;
+        }
+        .product-card .meta {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        .product-card .seller-link {
+            font-size: 0.85rem;
+            color: var(--primary);
+            text-decoration: none;
+        }
+        .product-card .seller-link:hover { text-decoration: underline; }
+        .product-img {
+            width: 100%;
+            height: 160px;
+            object-fit: cover;
+            border-radius: 6px;
+            background: var(--border);
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.92rem;
+            background: var(--card-bg);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        th, td {
+            text-align: left;
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        th { background: #f0eef9; font-weight: 600; }
+        tr:hover td { background: #fafafa; }
+        .address-cell {
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
+        /* Form */
+        .form-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+        .form-group { display: flex; flex-direction: column; gap: 4px; }
+        .form-group label { font-weight: 600; font-size: 0.85rem; }
+        .form-group input {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 0.9rem;
+        }
+        .form-group input:focus { outline: 2px solid var(--primary); border-color: transparent; }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 16px;
+        }
+        .pagination span { font-size: 0.85rem; color: var(--text-muted); }
+
+        /* General */
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            width: 20px; height: 20px;
+            animation: spin 0.8s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .error-msg { color: var(--error); padding: 12px; background: #fef2f2; border-radius: 6px; margin: 10px 0; }
+        .empty-state { text-align: center; color: var(--text-muted); padding: 40px 20px; }
+        .copy-btn {
+            background: none; border: none; cursor: pointer;
+            color: var(--text-muted); font-size: 0.85rem; padding: 2px;
+        }
+        .copy-btn:hover { color: var(--primary); }
+
+        @media (max-width: 600px) {
+            .form-row { flex-direction: column; }
+            .card-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+    <script defer data-domain="aboutcircles.github.io/circlestools" src="https://plausible.io/js/script.js"></script>
+</head>
+<body>
+    <header>
+        <div>
+            <h1><i class="fas fa-store" style="margin-right: 8px;"></i>Marketplace Explorer</h1>
+        </div>
+        <div class="header-links">
+            <a href="index.html"><i class="fas fa-home"></i> Tools</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="api-config">
+            <i class="fas fa-server"></i>
+            API: <code id="apiUrlDisplay"></code>
+        </div>
+
+        <div class="tab-bar" id="tabBar"></div>
+
+        <div class="tab-content active" id="tab-catalog">
+            <div id="catalogContent"></div>
+        </div>
+
+        <div class="tab-content" id="tab-sellers">
+            <div id="sellersContent"></div>
+        </div>
+
+        <div class="tab-content" id="tab-inventory">
+            <div id="inventoryContent"></div>
+        </div>
+    </div>
+
+    <script>
+    // ─── Configuration ───────────────────────────────────────────────
+    var DEFAULT_API = 'https://rpc.aboutcircles.com/market';
+    var PROFILES_API = 'https://rpc.aboutcircles.com/profiles';
+    var OPERATOR = '0x20ced4ed3b1651b832a77e13e54ea5cb14c8b95b';
+
+    var apiBase = DEFAULT_API;
+    var sellersList = [];
+    var catalogCursor = null;
+    var catalogItems = [];
+    var currentTab = 'catalog';
+
+    // ─── Init ────────────────────────────────────────────────────────
+    (function init() {
+        var params = new URLSearchParams(window.location.search);
+        var override = params.get('marketplaceApi') || params.get('api');
+        if (override) apiBase = override.replace(/\/+$/, '');
+        document.getElementById('apiUrlDisplay').textContent = apiBase;
+        buildTabs();
+        loadSellersAndCatalog();
+        renderInventoryForm();
+    })();
+
+    // ─── DOM helper ──────────────────────────────────────────────────
+    function el(tag, attrs, children) {
+        var e = document.createElement(tag);
+        if (attrs) Object.keys(attrs).forEach(function(k) {
+            var v = attrs[k];
+            if (k === 'className') e.className = v;
+            else if (k === 'textContent') e.textContent = v;
+            else if (k.startsWith('on') && typeof v === 'function') e.addEventListener(k.slice(2).toLowerCase(), v);
+            else e.setAttribute(k, v);
+        });
+        if (children !== undefined && children !== null) {
+            if (typeof children === 'string') e.textContent = children;
+            else if (Array.isArray(children)) children.forEach(function(c) { if (c) e.appendChild(c); });
+            else e.appendChild(children);
+        }
+        return e;
+    }
+
+    function truncAddr(a) {
+        if (!a) return '';
+        return a.slice(0, 6) + '...' + a.slice(-4);
+    }
+
+    function copyText(t) { navigator.clipboard.writeText(t); }
+
+    function clearEl(id) { var e = document.getElementById(id); e.textContent = ''; return e; }
+
+    function showLoading(container) {
+        container.textContent = '';
+        container.appendChild(el('div', {style: 'text-align:center;padding:30px;'}, [
+            el('span', {className: 'loader'}),
+            document.createTextNode(' Loading...')
+        ]));
+    }
+
+    function showError(container, msg) {
+        container.textContent = '';
+        container.appendChild(el('div', {className: 'error-msg'}, msg));
+    }
+
+    // ─── Tabs ────────────────────────────────────────────────────────
+    var TABS = [
+        {id: 'catalog', label: 'Catalog', icon: 'fa-boxes-stacked'},
+        {id: 'sellers', label: 'Sellers', icon: 'fa-users'},
+        {id: 'inventory', label: 'Inventory', icon: 'fa-warehouse'}
+    ];
+
+    function buildTabs() {
+        var bar = document.getElementById('tabBar');
+        bar.textContent = '';
+        TABS.forEach(function(t) {
+            var btn = el('button', {
+                className: 'tab-btn' + (currentTab === t.id ? ' active' : ''),
+                'data-tab': t.id,
+                onClick: function() { switchTab(t.id); }
+            });
+            btn.appendChild(el('i', {className: 'fas ' + t.icon, style: 'margin-right:6px;'}));
+            btn.appendChild(document.createTextNode(t.label));
+            bar.appendChild(btn);
+        });
+    }
+
+    function switchTab(id) {
+        currentTab = id;
+        document.querySelectorAll('.tab-btn').forEach(function(btn) {
+            btn.classList.toggle('active', btn.getAttribute('data-tab') === id);
+        });
+        document.querySelectorAll('.tab-content').forEach(function(tc) {
+            tc.classList.toggle('active', tc.id === 'tab-' + id);
+        });
+    }
+
+    // ─── Catalog + Sellers ───────────────────────────────────────────
+    async function loadSellersAndCatalog() {
+        var catalogContainer = document.getElementById('catalogContent');
+        showLoading(catalogContainer);
+
+        try {
+            var res = await fetch(apiBase + '/api/sellers');
+            if (!res.ok) throw new Error('Sellers API: ' + res.status);
+            var data = await res.json();
+            sellersList = data.sellers || data || [];
+
+            renderSellersTable();
+            await loadCatalog(true);
+        } catch (err) {
+            showError(catalogContainer, 'Failed to load: ' + err.message);
+        }
+    }
+
+    async function loadCatalog(reset) {
+        var container = document.getElementById('catalogContent');
+        if (reset) {
+            catalogItems = [];
+            catalogCursor = null;
+        }
+
+        var avatarParams = sellersList.map(function(s) {
+            return 'avatars=' + encodeURIComponent(s.seller || s.address || s);
+        }).join('&');
+
+        var url = apiBase + '/api/operator/' + OPERATOR + '/catalog?' + avatarParams + '&pageSize=20';
+        if (catalogCursor) url += '&cursor=' + encodeURIComponent(catalogCursor);
+
+        if (reset) showLoading(container);
+
+        try {
+            var res = await fetch(url);
+            if (!res.ok) throw new Error('Catalog API: ' + res.status);
+            var data = await res.json();
+
+            var items = data.items || data.products || data || [];
+            catalogCursor = data.cursor || data.nextCursor || null;
+            catalogItems = catalogItems.concat(items);
+
+            renderCatalog();
+        } catch (err) {
+            showError(container, 'Failed to load catalog: ' + err.message);
+        }
+    }
+
+    function renderCatalog() {
+        var container = clearEl('catalogContent');
+
+        if (!catalogItems.length) {
+            container.appendChild(el('div', {className: 'empty-state'}, 'No catalog items found.'));
+            return;
+        }
+
+        var grid = el('div', {className: 'card-grid'});
+
+        catalogItems.forEach(function(item) {
+            var card = el('div', {className: 'product-card'});
+
+            var imgUrl = item.imageUrl || item.image || '';
+            if (imgUrl) {
+                var img = el('img', {className: 'product-img', alt: item.name || 'Product'});
+                img.src = imgUrl;
+                img.onerror = function() { this.style.display = 'none'; };
+                card.appendChild(img);
+            }
+
+            card.appendChild(el('h3', {}, item.name || item.title || 'Unnamed'));
+
+            if (item.description) {
+                var desc = item.description.length > 100 ? item.description.slice(0, 100) + '...' : item.description;
+                card.appendChild(el('p', {className: 'meta'}, desc));
+            }
+
+            var priceStr = item.price != null ? String(item.price) : 'N/A';
+            if (item.currency) priceStr += ' ' + item.currency;
+            card.appendChild(el('div', {className: 'price'}, priceStr));
+
+            var sellerAddr = item.seller || item.sellerAddress || '';
+            if (sellerAddr) {
+                var sellerRow = el('div', {className: 'meta', style: 'margin-top:4px;'});
+                sellerRow.appendChild(document.createTextNode('Seller: '));
+                var sellerLink = el('a', {
+                    className: 'seller-link',
+                    href: 'profileChecker.html?address=' + sellerAddr,
+                    target: '_blank'
+                }, truncAddr(sellerAddr));
+                sellerRow.appendChild(sellerLink);
+                card.appendChild(sellerRow);
+            }
+
+            if (item.sku) {
+                card.appendChild(el('div', {className: 'meta'}, 'SKU: ' + item.sku));
+            }
+
+            grid.appendChild(card);
+        });
+
+        container.appendChild(grid);
+
+        if (catalogCursor) {
+            var pag = el('div', {className: 'pagination'});
+            var moreBtn = el('button', {className: 'btn btn-sm btn-outline',
+                onClick: function() { loadCatalog(false); }});
+            moreBtn.appendChild(el('i', {className: 'fas fa-chevron-down', style: 'margin-right:6px;'}));
+            moreBtn.appendChild(document.createTextNode('Load More'));
+            pag.appendChild(moreBtn);
+            container.appendChild(pag);
+        }
+    }
+
+    // ─── Sellers table ───────────────────────────────────────────────
+    function renderSellersTable() {
+        var container = clearEl('sellersContent');
+
+        if (!sellersList.length) {
+            container.appendChild(el('div', {className: 'empty-state'}, 'No sellers found.'));
+            return;
+        }
+
+        var table = el('table');
+        var thead = el('thead');
+        var hr = el('tr');
+        ['Address', 'Chain', 'Profile', 'Actions'].forEach(function(h) {
+            hr.appendChild(el('th', {}, h));
+        });
+        thead.appendChild(hr);
+        table.appendChild(thead);
+
+        var tbody = el('tbody');
+        sellersList.forEach(function(seller) {
+            var addr = seller.seller || seller.address || String(seller);
+            var chain = seller.chainId || '100';
+            var row = el('tr');
+
+            var addrCell = el('td', {className: 'address-cell'});
+            addrCell.appendChild(document.createTextNode(truncAddr(addr) + ' '));
+            var cpBtn = el('button', {className: 'copy-btn', title: 'Copy address',
+                onClick: function() { copyText(addr); }});
+            cpBtn.appendChild(el('i', {className: 'fas fa-copy'}));
+            addrCell.appendChild(cpBtn);
+            row.appendChild(addrCell);
+
+            row.appendChild(el('td', {}, String(chain)));
+
+            var nameCell = el('td', {}, 'Loading...');
+            row.appendChild(nameCell);
+            enrichProfileName(addr).then(function(name) {
+                nameCell.textContent = name;
+            });
+
+            var actCell = el('td');
+            var profileBtn = el('a', {
+                className: 'btn btn-sm btn-outline',
+                href: 'profileChecker.html?address=' + addr,
+                target: '_blank',
+                style: 'text-decoration:none;display:inline-flex;align-items:center;gap:4px;'
+            });
+            profileBtn.appendChild(el('i', {className: 'fas fa-user'}));
+            profileBtn.appendChild(document.createTextNode(' Profile'));
+            actCell.appendChild(profileBtn);
+            row.appendChild(actCell);
+
+            tbody.appendChild(row);
+        });
+
+        table.appendChild(tbody);
+        container.appendChild(table);
+    }
+
+    async function enrichProfileName(address) {
+        try {
+            var res = await fetch(PROFILES_API + '/search?address=' + address.toLowerCase());
+            if (!res.ok) return 'Unknown';
+            var data = await res.json();
+            if (Array.isArray(data)) {
+                var profile = data.find(function(p) { return p.address && p.address.toLowerCase() === address.toLowerCase(); });
+                return profile ? (profile.name || 'No name') : 'Not found';
+            }
+            return 'Unknown';
+        } catch (e) {
+            return 'Error';
+        }
+    }
+
+    // ─── Inventory ───────────────────────────────────────────────────
+    function renderInventoryForm() {
+        var container = clearEl('inventoryContent');
+
+        var form = el('div');
+        var row = el('div', {className: 'form-row'});
+
+        var chainGroup = el('div', {className: 'form-group'});
+        chainGroup.appendChild(el('label', {}, 'Chain ID'));
+        chainGroup.appendChild(el('input', {type: 'text', id: 'invChainId', value: '100', style: 'width:80px;'}));
+        row.appendChild(chainGroup);
+
+        var sellerGroup = el('div', {className: 'form-group', style: 'flex:1;'});
+        sellerGroup.appendChild(el('label', {}, 'Seller Address'));
+        sellerGroup.appendChild(el('input', {type: 'text', id: 'invSeller', placeholder: '0x...'}));
+        row.appendChild(sellerGroup);
+
+        var skuGroup = el('div', {className: 'form-group'});
+        skuGroup.appendChild(el('label', {}, 'SKU'));
+        skuGroup.appendChild(el('input', {type: 'text', id: 'invSku', placeholder: 'Product SKU'}));
+        row.appendChild(skuGroup);
+
+        var btnGroup = el('div', {className: 'form-group'});
+        btnGroup.appendChild(el('label', {}, '\u00A0'));
+        btnGroup.appendChild(el('button', {className: 'btn', onClick: checkInventory}, 'Check'));
+        row.appendChild(btnGroup);
+
+        form.appendChild(row);
+        container.appendChild(form);
+        container.appendChild(el('div', {id: 'inventoryResult'}));
+    }
+
+    async function checkInventory() {
+        var chainId = document.getElementById('invChainId').value.trim() || '100';
+        var seller = document.getElementById('invSeller').value.trim();
+        var sku = document.getElementById('invSku').value.trim();
+
+        if (!seller || !sku) {
+            showError(document.getElementById('inventoryResult'), 'Please enter seller address and SKU.');
+            return;
+        }
+
+        var resultDiv = clearEl('inventoryResult');
+        showLoading(resultDiv);
+
+        try {
+            var [avail, inv] = await Promise.allSettled([
+                fetch(apiBase + '/inventory/availability/' + chainId + '/' + seller + '/' + encodeURIComponent(sku)).then(function(r) { return r.ok ? r.json() : null; }),
+                fetch(apiBase + '/inventory/inventory/' + chainId + '/' + seller + '/' + encodeURIComponent(sku)).then(function(r) { return r.ok ? r.json() : null; })
+            ]);
+
+            resultDiv.textContent = '';
+            var card = el('div', {className: 'product-card', style: 'max-width:400px;'});
+
+            card.appendChild(el('h3', {}, 'Inventory for SKU: ' + sku));
+
+            if (avail.status === 'fulfilled' && avail.value != null) {
+                var availVal = typeof avail.value === 'object' ? JSON.stringify(avail.value) : String(avail.value);
+                card.appendChild(el('div', {}, [
+                    el('strong', {}, 'Availability: '),
+                    document.createTextNode(availVal)
+                ]));
+            }
+            if (inv.status === 'fulfilled' && inv.value != null) {
+                var invVal = typeof inv.value === 'object' ? JSON.stringify(inv.value, null, 2) : String(inv.value);
+                card.appendChild(el('div', {style: 'margin-top:8px;'}, [
+                    el('strong', {}, 'Inventory Details:'),
+                    el('pre', {style: 'margin-top:4px;font-size:0.85rem;white-space:pre-wrap;'}, invVal)
+                ]));
+            }
+            if ((!avail.value && avail.status === 'fulfilled') && (!inv.value && inv.status === 'fulfilled')) {
+                card.appendChild(el('div', {className: 'meta'}, 'No inventory data found for this combination.'));
+            }
+
+            resultDiv.appendChild(card);
+        } catch (err) {
+            showError(resultDiv, 'Inventory check failed: ' + err.message);
+        }
+    }
+    </script>
+</body>
+</html>
