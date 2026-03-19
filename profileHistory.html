@@ -1128,15 +1128,17 @@
                 await connectWallet();
             }
 
-            // Step 2: Verify address match
-            if (connectedAddr.toLowerCase() !== currentAddress.toLowerCase()) {
-                alert('Wrong wallet connected!\n\nConnected: ' + connectedAddr + '\nNeeded: ' + currentAddress + '\n\nPlease switch to the correct account in your wallet and try again.');
-                if (restoreBtn) { restoreBtn.disabled = false; restoreBtn.textContent = 'Restore'; }
-                return;
+            // Step 2: Confirm (no strict address check — signer may be a Safe owner)
+            var isSameAddr = connectedAddr.toLowerCase() === currentAddress.toLowerCase();
+            var confirmMsg = 'Restore profile to CID:\n' + cid + '\n\n';
+            if (isSameAddr) {
+                confirmMsg += 'Sending tx from ' + connectedAddr.slice(0,6) + '...' + connectedAddr.slice(-4);
+            } else {
+                confirmMsg += 'Connected: ' + connectedAddr.slice(0,6) + '...' + connectedAddr.slice(-4) + '\n';
+                confirmMsg += 'Profile: ' + currentAddress.slice(0,6) + '...' + currentAddress.slice(-4) + '\n\n';
+                confirmMsg += 'If ' + currentAddress.slice(0,6) + '... is a Safe, ensure your connected account is an owner.';
             }
-
-            // Step 3: Confirm
-            if (!confirm('Restore profile to CID:\n' + cid + '\n\nThis sends a transaction from ' + connectedAddr.slice(0,6) + '...' + connectedAddr.slice(-4)))
+            if (!confirm(confirmMsg))
                 return;
 
             // Step 4: Send tx
