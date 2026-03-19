@@ -209,35 +209,87 @@
             cursor: pointer;
         }
 
-        /* Detail panel */
-        .detail-panel {
+        /* Bottom inspect panel (fixed) */
+        .inspect-panel {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            height: 280px;
+            min-height: 100px;
+            max-height: 70vh;
             background: var(--card-bg);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            margin-top: 24px;
-            overflow: hidden;
+            border-top: 1px solid var(--border);
+            display: none;
+            flex-direction: column;
+            z-index: 50;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
         }
-        .detail-header {
-            padding: 12px 16px;
+        .inspect-panel.visible { display: flex; }
+        .inspect-panel .resize-handle {
+            position: absolute;
+            left: 0; right: 0; top: 0;
+            height: 5px;
+            cursor: row-resize;
+            background: transparent;
+            z-index: 10;
+            transition: background 0.2s;
+        }
+        .inspect-panel .resize-handle:hover,
+        .inspect-panel .resize-handle.dragging { background: var(--accent); }
+        .inspect-header {
+            padding: 8px 16px;
             background: #f0eef9;
             font-weight: 600;
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-shrink: 0;
+            gap: 8px;
         }
-        .detail-body {
-            padding: 16px;
-            max-height: 500px;
+        .inspect-header .header-left {
+            display: flex; align-items: center; gap: 8px;
+            min-width: 0; overflow: hidden;
+        }
+        .inspect-header .header-left span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .inspect-header .header-actions { display: flex; gap: 6px; flex-shrink: 0; }
+        .inspect-close {
+            background: none; border: none; cursor: pointer;
+            font-size: 1.1rem; color: var(--text-muted);
+            padding: 4px 6px; border-radius: 4px;
+            transition: background 0.2s;
+        }
+        .inspect-close:hover { background: #e5e3fb; color: var(--text); }
+        .inspect-body {
+            flex: 1;
             overflow: auto;
+            padding: 12px 16px;
         }
-        .detail-body pre {
+        .inspect-body pre {
             margin: 0;
             white-space: pre-wrap;
             word-break: break-word;
             font-size: 0.85rem;
             line-height: 1.5;
         }
+        /* Base64 image preview */
+        .b64-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin: 4px 0;
+        }
+        .b64-row pre { flex: 1; min-width: 0; }
+        .b64-preview {
+            flex-shrink: 0;
+            max-width: 120px;
+            max-height: 120px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            object-fit: contain;
+            background: #f9f9f9;
+        }
+        /* Adjust main content to not hide behind panel */
+        body.panel-open .container { padding-bottom: 300px; }
 
         /* Diff view */
         .diff-container {
@@ -323,7 +375,21 @@
 
         <div id="profileSection" style="display:none;"></div>
         <div id="timelineSection"></div>
-        <div id="detailSection"></div>
+    </div>
+
+    <!-- Fixed bottom inspect panel -->
+    <div class="inspect-panel" id="inspectPanel">
+        <div class="resize-handle" id="resizeHandle"></div>
+        <div class="inspect-header">
+            <div class="header-left">
+                <span id="inspectTitle">CID Content</span>
+            </div>
+            <div class="header-actions">
+                <button class="copy-btn" id="inspectCopyBtn" title="Copy CID"><i class="fas fa-copy"></i></button>
+                <button class="inspect-close" id="inspectCloseBtn" title="Close"><i class="fas fa-xmark"></i></button>
+            </div>
+        </div>
+        <div class="inspect-body" id="inspectBody"></div>
     </div>
 
     <script>
@@ -450,12 +516,10 @@
 
         var profileSection = document.getElementById('profileSection');
         var timelineSection = document.getElementById('timelineSection');
-        var detailSection = document.getElementById('detailSection');
-
+        closePanel();
         profileSection.style.display = 'none';
         profileSection.textContent = '';
         timelineSection.textContent = '';
-        detailSection.textContent = '';
 
         try {
             var [profile, history] = await Promise.allSettled([
@@ -652,31 +716,100 @@
         }
     }
 
-    async function inspectCid(cid, label) {
-        var detailSection = document.getElementById('detailSection');
-        detailSection.textContent = '';
+    // ─── Bottom panel helpers ────────────────────────────────────────
+    var currentPanelCid = '';
 
-        var panel = el('div', {className: 'detail-panel'});
-        var header = el('div', {className: 'detail-header'});
-        header.appendChild(el('span', {}, (label || 'CID') + ': ' + cid));
-        var copyHdr = el('button', {className: 'copy-btn', title: 'Copy full CID',
-            onClick: function() { copyText(cid); }});
-        copyHdr.appendChild(el('i', {className: 'fas fa-copy'}));
-        copyHdr.appendChild(document.createTextNode(' Copy'));
-        header.appendChild(copyHdr);
-        panel.appendChild(header);
+    function openPanel(title, cid) {
+        currentPanelCid = cid || '';
+        document.getElementById('inspectTitle').textContent = title;
+        document.getElementById('inspectPanel').classList.add('visible');
+        document.body.classList.add('panel-open');
+    }
 
-        var body = el('div', {className: 'detail-body'});
+    function closePanel() {
+        document.getElementById('inspectPanel').classList.remove('visible');
+        document.body.classList.remove('panel-open');
+        document.getElementById('inspectBody').textContent = '';
+    }
+
+    function panelLoading() {
+        var body = document.getElementById('inspectBody');
+        body.textContent = '';
         body.appendChild(el('span', {className: 'loader'}));
         body.appendChild(document.createTextNode(' Loading...'));
-        panel.appendChild(body);
-        detailSection.appendChild(panel);
+    }
 
+    // Base64 image detection regex
+    var B64_IMG_RE = /^data:image\/[a-z+]+;base64,/;
+
+    function renderJsonWithPreviews(obj) {
+        var body = document.getElementById('inspectBody');
+        body.textContent = '';
+        // Walk keys, render each as a row; if value is base64 image, show preview
+        if (typeof obj !== 'object' || obj === null) {
+            body.appendChild(el('pre', {}, JSON.stringify(obj, null, 2)));
+            return;
+        }
+        Object.keys(obj).forEach(function(key) {
+            var val = obj[key];
+            var strVal = typeof val === 'string' ? val : JSON.stringify(val, null, 2);
+
+            if (typeof val === 'string' && B64_IMG_RE.test(val)) {
+                // Base64 image — show preview alongside truncated value
+                var row = el('div', {className: 'b64-row'});
+                var truncated = val.slice(0, 60) + '... (' + Math.round(val.length / 1024) + ' KB)';
+                row.appendChild(el('pre', {}, '"' + key + '": "' + truncated + '"'));
+                var img = el('img', {className: 'b64-preview', alt: key});
+                img.src = val;
+                row.appendChild(img);
+                body.appendChild(row);
+            } else {
+                body.appendChild(el('pre', {}, '"' + key + '": ' + strVal));
+            }
+        });
+    }
+
+    // Close + copy wiring
+    document.getElementById('inspectCloseBtn').addEventListener('click', closePanel);
+    document.getElementById('inspectCopyBtn').addEventListener('click', function() { copyText(currentPanelCid); });
+
+    // ─── Resize drag ─────────────────────────────────────────────────
+    (function initResize() {
+        var handle = document.getElementById('resizeHandle');
+        var panel = document.getElementById('inspectPanel');
+        var dragging = false;
+
+        handle.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            dragging = true;
+            handle.classList.add('dragging');
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+
+        function onMove(e) {
+            if (!dragging) return;
+            var newH = window.innerHeight - e.clientY;
+            newH = Math.max(100, Math.min(newH, window.innerHeight * 0.7));
+            panel.style.height = newH + 'px';
+        }
+        function onUp() {
+            dragging = false;
+            handle.classList.remove('dragging');
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+        }
+    })();
+
+    // ─── Inspect / View ──────────────────────────────────────────────
+    async function inspectCid(cid, label) {
+        openPanel((label || 'CID') + ': ' + cid, cid);
+        panelLoading();
         try {
             var content = await fetchCidContent(cid);
-            body.textContent = '';
-            body.appendChild(el('pre', {}, JSON.stringify(content, null, 2)));
+            renderJsonWithPreviews(content);
         } catch (err) {
+            var body = document.getElementById('inspectBody');
             body.textContent = '';
             body.appendChild(el('div', {className: 'error-msg'}, 'Failed to load: ' + err.message));
         }
@@ -688,33 +821,16 @@
 
         var entry = historyEntries[idx];
         var cid = entry.cid || entry.cidV0 || '';
-        var detailSection = document.getElementById('detailSection');
-        detailSection.textContent = '';
-
-        var panel = el('div', {className: 'detail-panel'});
-        var header = el('div', {className: 'detail-header'});
-        header.appendChild(el('span', {}, 'Profile at CID: ' + truncateCid(cid)));
-        var copyHdr = el('button', {className: 'copy-btn', title: 'Copy full CID',
-            onClick: function() { copyText(cid); }});
-        copyHdr.appendChild(el('i', {className: 'fas fa-copy'}));
-        copyHdr.appendChild(document.createTextNode(' Copy CID'));
-        header.appendChild(copyHdr);
-        panel.appendChild(header);
-
-        var body = el('div', {className: 'detail-body'});
-        body.appendChild(el('span', {className: 'loader'}));
-        body.appendChild(document.createTextNode(' Loading...'));
-        panel.appendChild(body);
-        detailSection.appendChild(panel);
-
+        var label = idx === 0 ? 'Current' : '#' + (idx + 1);
+        openPanel(label + ' — ' + cid, cid);
+        panelLoading();
         try {
             var content = await fetchCidContent(cid);
-            body.textContent = '';
-            var pre = el('pre', {}, JSON.stringify(content, null, 2));
-            body.appendChild(pre);
+            renderJsonWithPreviews(content);
         } catch (err) {
+            var body = document.getElementById('inspectBody');
             body.textContent = '';
-            body.appendChild(el('div', {className: 'error-msg'}, 'Failed to load CID content: ' + err.message));
+            body.appendChild(el('div', {className: 'error-msg'}, 'Failed: ' + err.message));
         }
     }
 
@@ -749,18 +865,8 @@
         var cidA = entryA.cid || entryA.cidV0;
         var cidB = entryB.cid || entryB.cidV0;
 
-        var detailSection = document.getElementById('detailSection');
-        detailSection.textContent = '';
-
-        var panel = el('div', {className: 'detail-panel'});
-        var header = el('div', {className: 'detail-header'});
-        header.appendChild(el('span', {}, 'Diff: #' + (idxA + 1) + ' vs #' + (idxB + 1)));
-        panel.appendChild(header);
-        var body = el('div', {className: 'detail-body'});
-        body.appendChild(el('span', {className: 'loader'}));
-        body.appendChild(document.createTextNode(' Loading both CIDs...'));
-        panel.appendChild(body);
-        detailSection.appendChild(panel);
+        openPanel('Diff: #' + (idxA + 1) + ' vs #' + (idxB + 1), '');
+        panelLoading();
 
         try {
             var [contentA, contentB] = await Promise.all([
@@ -769,94 +875,72 @@
             ]);
             renderDiff(contentA, contentB, cidA, cidB, idxA, idxB);
         } catch (err) {
+            var body = document.getElementById('inspectBody');
             body.textContent = '';
             body.appendChild(el('div', {className: 'error-msg'}, 'Diff failed: ' + err.message));
         }
     }
 
     function renderDiff(objA, objB, cidA, cidB, idxA, idxB) {
-        // Recursive diff: walks nested objects/arrays and emits per-leaf lines
         function diffLines(a, b, prefix) {
             var lines = [];
-            if (a === b || JSON.stringify(a) === JSON.stringify(b)) {
-                // identical subtree — emit collapsed
-                lines.push({cls: 'diff-unchanged', textA: prefix + JSON.stringify(a), textB: prefix + JSON.stringify(b)});
+            var strA = JSON.stringify(a), strB = JSON.stringify(b);
+            if (a === b || strA === strB) {
+                // Skip base64 image data in unchanged lines for readability
+                var display = (typeof a === 'string' && B64_IMG_RE.test(a))
+                    ? '"' + a.slice(0, 40) + '..." (image)'
+                    : strA;
+                lines.push({cls: 'diff-unchanged', textA: prefix + display, textB: prefix + display});
                 return lines;
             }
             var aIsObj = a !== null && typeof a === 'object' && !Array.isArray(a);
             var bIsObj = b !== null && typeof b === 'object' && !Array.isArray(b);
             if (aIsObj && bIsObj) {
-                var keys = Array.from(new Set(Object.keys(a).concat(Object.keys(b)))).sort();
-                keys.forEach(function(k) {
-                    var childPrefix = prefix ? prefix + '.' + k : k;
-                    if (!(k in a)) {
-                        lines.push({cls: 'diff-added', textA: '', textB: childPrefix + ': ' + JSON.stringify(b[k])});
-                    } else if (!(k in b)) {
-                        lines.push({cls: 'diff-removed', textA: childPrefix + ': ' + JSON.stringify(a[k]), textB: ''});
-                    } else {
-                        lines = lines.concat(diffLines(a[k], b[k], childPrefix));
-                    }
+                Array.from(new Set(Object.keys(a).concat(Object.keys(b)))).sort().forEach(function(k) {
+                    var cp = prefix ? prefix + '.' + k : k;
+                    if (!(k in a)) lines.push({cls: 'diff-added', textA: '', textB: cp + ': ' + JSON.stringify(b[k])});
+                    else if (!(k in b)) lines.push({cls: 'diff-removed', textA: cp + ': ' + JSON.stringify(a[k]), textB: ''});
+                    else lines = lines.concat(diffLines(a[k], b[k], cp));
                 });
                 return lines;
             }
-            var aIsArr = Array.isArray(a);
-            var bIsArr = Array.isArray(b);
-            if (aIsArr && bIsArr) {
-                var maxLen = Math.max(a.length, b.length);
-                for (var i = 0; i < maxLen; i++) {
-                    var idxPrefix = prefix + '[' + i + ']';
-                    if (i >= a.length) {
-                        lines.push({cls: 'diff-added', textA: '', textB: idxPrefix + ': ' + JSON.stringify(b[i])});
-                    } else if (i >= b.length) {
-                        lines.push({cls: 'diff-removed', textA: idxPrefix + ': ' + JSON.stringify(a[i]), textB: ''});
-                    } else {
-                        lines = lines.concat(diffLines(a[i], b[i], idxPrefix));
-                    }
+            if (Array.isArray(a) && Array.isArray(b)) {
+                for (var i = 0; i < Math.max(a.length, b.length); i++) {
+                    var ip = prefix + '[' + i + ']';
+                    if (i >= a.length) lines.push({cls: 'diff-added', textA: '', textB: ip + ': ' + JSON.stringify(b[i])});
+                    else if (i >= b.length) lines.push({cls: 'diff-removed', textA: ip + ': ' + JSON.stringify(a[i]), textB: ''});
+                    else lines = lines.concat(diffLines(a[i], b[i], ip));
                 }
                 return lines;
             }
-            // Leaf difference
-            lines.push({
-                cls: 'diff-changed',
-                textA: prefix + ': ' + JSON.stringify(a),
-                textB: prefix + ': ' + JSON.stringify(b)
-            });
+            lines.push({cls: 'diff-changed', textA: prefix + ': ' + strA, textB: prefix + ': ' + strB});
             return lines;
         }
 
         var lines = diffLines(objA || {}, objB || {}, '');
+        var body = document.getElementById('inspectBody');
+        body.textContent = '';
 
-        var detailSection = document.getElementById('detailSection');
-        detailSection.textContent = '';
-
-        var panel = el('div', {className: 'detail-panel'});
-        var header = el('div', {className: 'detail-header'});
-        header.appendChild(el('span', {}, 'Diff: #' + (idxA + 1) + ' vs #' + (idxB + 1)));
-        panel.appendChild(header);
-
-        var body = el('div', {className: 'detail-body'});
         var container = el('div', {className: 'diff-container'});
-
         var sideA = el('div', {className: 'diff-side'});
         sideA.appendChild(el('h3', {}, '#' + (idxA + 1) + ' \u2014 ' + truncateCid(cidA)));
         var sideB = el('div', {className: 'diff-side'});
         sideB.appendChild(el('h3', {}, '#' + (idxB + 1) + ' \u2014 ' + truncateCid(cidB)));
 
         lines.forEach(function(l) {
-            var lineA = el('div', {className: 'diff-line ' + (l.cls === 'diff-changed' ? 'diff-removed' : l.cls === 'diff-added' ? '' : l.cls)});
-            lineA.textContent = l.textA || '\u00A0';
-            sideA.appendChild(lineA);
-
-            var lineB = el('div', {className: 'diff-line ' + (l.cls === 'diff-changed' ? 'diff-added' : l.cls === 'diff-removed' ? '' : l.cls)});
-            lineB.textContent = l.textB || '\u00A0';
-            sideB.appendChild(lineB);
+            var clsA = l.cls === 'diff-changed' ? 'diff-removed' : l.cls === 'diff-added' ? '' : l.cls;
+            var clsB = l.cls === 'diff-changed' ? 'diff-added' : l.cls === 'diff-removed' ? '' : l.cls;
+            var la = el('div', {className: 'diff-line ' + clsA});
+            la.textContent = l.textA || '\u00A0';
+            sideA.appendChild(la);
+            var lb = el('div', {className: 'diff-line ' + clsB});
+            lb.textContent = l.textB || '\u00A0';
+            sideB.appendChild(lb);
         });
 
         container.appendChild(sideA);
         container.appendChild(sideB);
         body.appendChild(container);
-        panel.appendChild(body);
-        detailSection.appendChild(panel);
     }
     </script>
 </body>
