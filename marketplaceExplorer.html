@@ -449,7 +449,7 @@
             if (k === 'className') e.className = v;
             else if (k === 'textContent') e.textContent = v;
             else if (k.startsWith('on') && typeof v === 'function') e.addEventListener(k.slice(2).toLowerCase(), v);
-            else e.setAttribute(k, v);
+            else if (v !== undefined && v !== null) e.setAttribute(k, v);
         });
         if (children !== undefined && children !== null) {
             if (typeof children === 'string') e.textContent = children;
@@ -755,19 +755,28 @@
             }
         } catch (e) {}
 
-        // On-chain type from Circles RPC
+        // On-chain type from Circles RPC (structured DTO, not raw SQL)
         try {
-            var rpcRes = await fetch('https://rpc.aboutcircles.com', {
+            var rpcRes = await fetch('https://rpc.aboutcircles.com/', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({jsonrpc:'2.0',id:1,method:'circles_query',params:[
-                    'select avatar, avatar_type from v_avatars where avatar = \'' + key + '\' limit 1'
-                ]})
+                body: JSON.stringify({jsonrpc:'2.0',id:1,method:'circles_query',params:[{
+                    Namespace: 'V_Crc',
+                    Table: 'Avatars',
+                    Columns: ['avatar', 'type'],
+                    Filter: [{
+                        Type: 'FilterPredicate',
+                        FilterType: 'Equals',
+                        Column: 'avatar',
+                        Value: key
+                    }],
+                    Limit: 1
+                }]})
             });
             if (rpcRes.ok) {
                 var rpcData = await rpcRes.json();
                 var rows = rpcData.result && rpcData.result.rows;
-                if (rows && rows.length) info.type = rows[0][1] || null; // avatar_type
+                if (rows && rows.length) info.type = rows[0][1] || null;
             }
         } catch (e) {}
 

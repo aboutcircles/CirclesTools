@@ -408,6 +408,7 @@
     let diffSelections = [];   // max 2 CID indices for diffing
     let currentAddress = null;
     let offset = 0;
+    let viewGeneration = 0;    // race guard for rapid viewEntry clicks
     let hasMore = true;
 
     // Allow override via ?pinningApi= or ?api= query param
@@ -462,7 +463,7 @@
             if (k === 'className') e.className = v;
             else if (k === 'textContent') e.textContent = v;
             else if (k.startsWith('on')) e.addEventListener(k.slice(2).toLowerCase(), v);
-            else e.setAttribute(k, v);
+            else if (v !== undefined && v !== null) e.setAttribute(k, v);
         });
         if (children) {
             if (typeof children === 'string') e.textContent = children;
@@ -783,13 +784,13 @@
             notice.appendChild(el('i', {className: 'fas fa-triangle-exclamation', style: 'margin-right:6px;'}));
             notice.appendChild(document.createTextNode('Fetched via /raw fallback (CID was GC\'d, re-fetched from IPFS gateway)'));
             body.appendChild(notice);
-            delete obj._source;
         }
         if (typeof obj !== 'object' || obj === null) {
             body.appendChild(el('pre', {}, JSON.stringify(obj, null, 2)));
             return;
         }
         Object.keys(obj).forEach(function(key) {
+            if (key === '_source') return;
             var val = obj[key];
             var strVal = typeof val === 'string' ? val : JSON.stringify(val, null, 2);
 
@@ -855,18 +856,25 @@
     }
 
     async function viewEntry(idx) {
+        // Update selected state via class toggle instead of full rebuild
+        var prev = document.querySelector('.timeline-entry.selected');
+        if (prev) prev.classList.remove('selected');
+        var cur = document.querySelector('.timeline-entry[data-idx="' + idx + '"]');
+        if (cur) cur.classList.add('selected');
         selectedEntry = idx;
-        renderTimeline();
 
+        var gen = ++viewGeneration;
         var entry = historyEntries[idx];
         var cid = entry.cid || entry.cidV0 || '';
         var label = idx === 0 ? 'Current' : '#' + (idx + 1);
-        openPanel(label + ' — ' + cid, cid);
+        openPanel(label + ' \u2014 ' + cid, cid);
         panelLoading();
         try {
             var content = await fetchCidContent(cid);
+            if (gen !== viewGeneration) return; // stale — newer click superseded
             renderJsonWithPreviews(content);
         } catch (err) {
+            if (gen !== viewGeneration) return;
             var body = document.getElementById('inspectBody');
             body.textContent = '';
             body.appendChild(el('div', {className: 'error-msg'}, 'Failed: ' + err.message));
@@ -897,7 +905,8 @@
     async function showDiff() {
         if (diffSelections.length !== 2) return;
 
-        var sorted = diffSelections.slice().sort(function(a, b) { return a - b; });
+        // Sort so older entry (higher index) is on left, newer on right
+        var sorted = diffSelections.slice().sort(function(a, b) { return b - a; });
         var idxA = sorted[0], idxB = sorted[1];
         var entryA = historyEntries[idxA];
         var entryB = historyEntries[idxB];
