@@ -561,7 +561,18 @@
             banner.appendChild(el('i', {className: 'fas fa-filter', style: 'color:#1e40af;'}));
             var info = sellerInfoCache[catalogFilterSeller.toLowerCase()];
             var label = info && info.name ? info.name : truncAddr(catalogFilterSeller);
-            banner.appendChild(document.createTextNode('Filtered by seller: ' + label));
+            banner.appendChild(document.createTextNode('Filtered by seller: ' + label + ' '));
+            // Quick-jump links for this seller
+            var jumpPayments = el('button', {className: 'btn btn-sm btn-outline', style: 'margin-left:8px;',
+                onClick: (function(a) { return function() { filterPaymentsBySeller(a); }; })(catalogFilterSeller)});
+            jumpPayments.appendChild(el('i', {className: 'fas fa-credit-card', style: 'margin-right:4px;'}));
+            jumpPayments.appendChild(document.createTextNode('Payments'));
+            banner.appendChild(jumpPayments);
+            var jumpScan = el('a', {className: 'btn btn-sm btn-outline', href: 'https://gnosisscan.io/address/' + catalogFilterSeller,
+                target: '_blank', style: 'text-decoration:none;margin-left:4px;'});
+            jumpScan.appendChild(el('i', {className: 'fas fa-arrow-up-right-from-square', style: 'margin-right:4px;'}));
+            jumpScan.appendChild(document.createTextNode('Gnosisscan'));
+            banner.appendChild(jumpScan);
             var clearBtn = el('button', {
                 className: 'btn btn-sm btn-outline',
                 style: 'margin-left:auto;',
@@ -934,7 +945,17 @@
             banner.appendChild(el('i', {className: 'fas fa-filter', style: 'color:#1e40af;'}));
             var info = sellerInfoCache[paymentFilterSeller.toLowerCase()];
             var label = info && info.name ? info.name : truncAddr(paymentFilterSeller);
-            banner.appendChild(document.createTextNode('Payments to: ' + label));
+            banner.appendChild(document.createTextNode('Payments to: ' + label + ' '));
+            var jumpProducts = el('button', {className: 'btn btn-sm btn-outline', style: 'margin-left:8px;',
+                onClick: (function(a) { return function() { filterCatalogBySeller(a); }; })(paymentFilterSeller)});
+            jumpProducts.appendChild(el('i', {className: 'fas fa-boxes-stacked', style: 'margin-right:4px;'}));
+            jumpProducts.appendChild(document.createTextNode('Products'));
+            banner.appendChild(jumpProducts);
+            var jumpScan = el('a', {className: 'btn btn-sm btn-outline', href: 'https://gnosisscan.io/address/' + paymentFilterSeller,
+                target: '_blank', style: 'text-decoration:none;margin-left:4px;'});
+            jumpScan.appendChild(el('i', {className: 'fas fa-arrow-up-right-from-square', style: 'margin-right:4px;'}));
+            jumpScan.appendChild(document.createTextNode('Gnosisscan'));
+            banner.appendChild(jumpScan);
             var clearBtn = el('button', {className: 'btn btn-sm btn-outline', style: 'margin-left:auto;', onClick: clearPaymentFilter});
             clearBtn.appendChild(el('i', {className: 'fas fa-xmark', style: 'margin-right:4px;'}));
             clearBtn.appendChild(document.createTextNode('Clear'));
