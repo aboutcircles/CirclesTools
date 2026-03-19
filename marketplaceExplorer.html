@@ -424,8 +424,10 @@
         });
 
         buildTabs();
-        loadSellersAndCatalog();
         renderInventoryForm();
+        // Delay initial load slightly — Brave Shields can block fetches during
+        // synchronous script execution but allows them after a microtask
+        setTimeout(function() { loadSellersAndCatalog(); }, 0);
     })();
 
     // ─── DOM helper ──────────────────────────────────────────────────
