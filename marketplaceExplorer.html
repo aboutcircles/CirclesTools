@@ -378,6 +378,10 @@
             <div id="sellersContent"></div>
         </div>
 
+        <div class="tab-content" id="tab-payments">
+            <div id="paymentsContent"></div>
+        </div>
+
         <div class="tab-content" id="tab-orders">
             <div id="ordersContent"></div>
         </div>
@@ -452,6 +456,7 @@
     var TABS = [
         {id: 'catalog', label: 'Catalog', icon: 'fa-boxes-stacked'},
         {id: 'sellers', label: 'Sellers', icon: 'fa-users'},
+        {id: 'payments', label: 'Payments', icon: 'fa-credit-card'},
         {id: 'orders', label: 'Orders', icon: 'fa-receipt', auth: true},
         {id: 'inventory', label: 'Inventory', icon: 'fa-warehouse'}
     ];
@@ -481,6 +486,7 @@
             tc.classList.toggle('active', tc.id === 'tab-' + id);
         });
         if (id === 'orders') renderOrdersTab();
+        if (id === 'payments') loadPayments();
     }
 
     // ─── Catalog + Sellers ───────────────────────────────────────────
@@ -708,6 +714,15 @@
             productsBtn.appendChild(document.createTextNode(' Products'));
             actCell.appendChild(productsBtn);
 
+            var payBtn = el('button', {
+                className: 'btn btn-sm btn-outline',
+                style: 'display:inline-flex;align-items:center;gap:4px;margin-right:6px;',
+                onClick: (function(a) { return function() { filterPaymentsBySeller(a); }; })(addr)
+            });
+            payBtn.appendChild(el('i', {className: 'fas fa-credit-card'}));
+            payBtn.appendChild(document.createTextNode(' Payments'));
+            actCell.appendChild(payBtn);
+
             var scanBtn = el('a', {
                 className: 'btn btn-sm btn-outline',
                 href: 'https://gnosisscan.io/address/' + addr,
@@ -804,6 +819,264 @@
             container.appendChild(badge);
         }
     }
+
+    // ─── Payments tab (on-chain data from indexer) ─────────────────
+    var RPC_URL = 'https://rpc.aboutcircles.com/';
+    var paymentsLoaded = false;
+    var paymentsPage = 0;
+    var paymentsPageSize = 25;
+    var allPayments = [];
+    var allGateways = {};
+    var paymentFilterSeller = null;
+
+    function rpcQuery(namespace, table, columns, filter, limit, order) {
+        var params = {Namespace: namespace, Table: table, Columns: columns, Filter: filter || [], Limit: limit || 50};
+        if (order) params.Order = order;
+        return fetch(RPC_URL, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({jsonrpc:'2.0', id:1, method:'circles_query', params:[params]})
+        }).then(function(r) { return r.json(); }).then(function(d) { return d.result; });
+    }
+
+    function hexToUtf8(hex) {
+        if (!hex || !hex.startsWith('0x')) return hex || '';
+        try {
+            var bytes = [];
+            for (var i = 2; i < hex.length; i += 2)
+                bytes.push(parseInt(hex.substr(i, 2), 16));
+            return new TextDecoder().decode(new Uint8Array(bytes));
+        } catch (e) { return hex; }
+    }
+
+    function formatCrc(amountWei) {
+        if (!amountWei) return '0';
+        var s = String(amountWei);
+        if (s.length <= 18) return '0.' + '0'.repeat(18 - s.length) + s.replace(/0+$/, '') || '0';
+        var whole = s.slice(0, s.length - 18);
+        var frac = s.slice(s.length - 18).replace(/0+$/, '');
+        return frac ? whole + '.' + frac : whole;
+    }
+
+    async function loadPayments() {
+        if (paymentsLoaded && !paymentFilterSeller) return;
+        var container = document.getElementById('paymentsContent');
+        showLoading(container);
+
+        try {
+            // Load gateways if not cached
+            if (!Object.keys(allGateways).length) {
+                var gwResult = await rpcQuery('CrcV2_PaymentGateway', 'GatewayCreated',
+                    ['owner', 'gateway', 'blockNumber', 'timestamp'], [], 200);
+                (gwResult.rows || []).forEach(function(r) {
+                    allGateways[r[1].toLowerCase()] = { owner: r[0], gateway: r[1], block: r[2], created: r[3] };
+                });
+            }
+
+            // Load payments
+            var filter = [];
+            if (paymentFilterSeller) {
+                filter.push({Type:'FilterPredicate', FilterType:'Equals', Column:'payee', Value: paymentFilterSeller.toLowerCase()});
+            }
+            var result = await rpcQuery('CrcV2_PaymentGateway', 'PaymentReceived',
+                ['payer', 'payee', 'gateway', 'amount', 'data', 'timestamp', 'transactionHash', 'blockNumber'],
+                filter, 200,
+                [{Column:'blockNumber', SortOrder:'DESC'}]);
+
+            allPayments = result.rows || [];
+            paymentsLoaded = !paymentFilterSeller;
+            renderPayments();
+        } catch (err) {
+            showError(container, 'Failed to load payments: ' + err.message);
+        }
+    }
+
+    function filterPaymentsBySeller(addr) {
+        paymentFilterSeller = addr;
+        paymentsLoaded = false;
+        switchTab('payments');
+        loadPayments();
+    }
+
+    function clearPaymentFilter() {
+        paymentFilterSeller = null;
+        paymentsLoaded = false;
+        loadPayments();
+    }
+
+    function renderPayments() {
+        var container = clearEl('paymentsContent');
+
+        // Summary stats
+        var totalVolume = 0;
+        var uniquePayers = {};
+        var uniquePayees = {};
+        allPayments.forEach(function(r) {
+            totalVolume += parseFloat(formatCrc(r[3]));
+            uniquePayers[r[0]] = true;
+            uniquePayees[r[1]] = true;
+        });
+
+        var stats = el('div', {style: 'display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap;'});
+        [['Payments', allPayments.length], ['Volume', totalVolume.toFixed(2) + ' CRC'],
+         ['Unique Payers', Object.keys(uniquePayers).length], ['Unique Payees', Object.keys(uniquePayees).length]
+        ].forEach(function(s) {
+            var card = el('div', {style: 'background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:12px 16px;min-width:120px;'});
+            card.appendChild(el('div', {style: 'font-size:0.8rem;color:var(--text-muted);'}, s[0]));
+            card.appendChild(el('div', {style: 'font-size:1.3rem;font-weight:700;'}, String(s[1])));
+            stats.appendChild(card);
+        });
+        container.appendChild(stats);
+
+        // Filter banner
+        if (paymentFilterSeller) {
+            var banner = el('div', {style: 'display:flex;align-items:center;gap:8px;padding:8px 12px;background:#dbeafe;border-radius:6px;margin-bottom:12px;font-size:0.9rem;'});
+            banner.appendChild(el('i', {className: 'fas fa-filter', style: 'color:#1e40af;'}));
+            var info = sellerInfoCache[paymentFilterSeller.toLowerCase()];
+            var label = info && info.name ? info.name : truncAddr(paymentFilterSeller);
+            banner.appendChild(document.createTextNode('Payments to: ' + label));
+            var clearBtn = el('button', {className: 'btn btn-sm btn-outline', style: 'margin-left:auto;', onClick: clearPaymentFilter});
+            clearBtn.appendChild(el('i', {className: 'fas fa-xmark', style: 'margin-right:4px;'}));
+            clearBtn.appendChild(document.createTextNode('Clear'));
+            banner.appendChild(clearBtn);
+            container.appendChild(banner);
+        }
+
+        // Gateways summary
+        var gwCount = Object.keys(allGateways).length;
+        if (gwCount && !paymentFilterSeller) {
+            var gwSection = el('div', {style: 'margin-bottom:16px;'});
+            gwSection.appendChild(el('h4', {style: 'margin-bottom:8px;font-size:0.95rem;'}, 'Payment Gateways (' + gwCount + ')'));
+            var gwTable = el('table');
+            var gwTh = el('thead');
+            var gwHr = el('tr');
+            ['Owner', 'Gateway Address', 'Created'].forEach(function(h) { gwHr.appendChild(el('th', {}, h)); });
+            gwTh.appendChild(gwHr);
+            gwTable.appendChild(gwTh);
+            var gwTb = el('tbody');
+            Object.values(allGateways).forEach(function(gw) {
+                var row = el('tr');
+                // Owner — clickable to filter payments
+                var ownerCell = el('td', {className: 'address-cell'});
+                var ownerLink = el('a', {href: '#', className: 'seller-link',
+                    onClick: (function(a) { return function(e) { e.preventDefault(); filterPaymentsBySeller(a); }; })(gw.owner)
+                }, truncAddr(gw.owner));
+                ownerCell.appendChild(ownerLink);
+                // Async enrich owner name
+                (function(link, addr) {
+                    enrichSeller(addr).then(function(info) { if (info.name) link.textContent = info.name; });
+                })(ownerLink, gw.owner);
+                ownerCell.appendChild(document.createTextNode(' '));
+                var cpBtn = el('button', {className: 'copy-btn', title: 'Copy', onClick: function() { copyText(gw.owner); }});
+                cpBtn.appendChild(el('i', {className: 'fas fa-copy'}));
+                ownerCell.appendChild(cpBtn);
+                row.appendChild(ownerCell);
+
+                var gwCell = el('td', {className: 'address-cell'});
+                gwCell.appendChild(document.createTextNode(truncAddr(gw.gateway) + ' '));
+                var gwCp = el('button', {className: 'copy-btn', title: 'Copy', onClick: function() { copyText(gw.gateway); }});
+                gwCp.appendChild(el('i', {className: 'fas fa-copy'}));
+                gwCell.appendChild(gwCp);
+                row.appendChild(gwCell);
+
+                row.appendChild(el('td', {}, new Date(gw.created * 1000).toLocaleString()));
+                gwTb.appendChild(row);
+            });
+            gwTable.appendChild(gwTb);
+            gwSection.appendChild(gwTable);
+            container.appendChild(gwSection);
+        }
+
+        // Payments table
+        if (!allPayments.length) {
+            container.appendChild(el('div', {className: 'empty-state'}, 'No payments found.'));
+            return;
+        }
+
+        container.appendChild(el('h4', {style: 'margin-bottom:8px;font-size:0.95rem;'}, 'Recent Payments'));
+        var table = el('table');
+        var thead = el('thead');
+        var hr = el('tr');
+        ['Time', 'Payer', 'Payee', 'Amount', 'Reference', 'Tx'].forEach(function(h) { hr.appendChild(el('th', {}, h)); });
+        thead.appendChild(hr);
+        table.appendChild(thead);
+
+        var tbody = el('tbody');
+        // Paginate
+        var start = paymentsPage * paymentsPageSize;
+        var page = allPayments.slice(start, start + paymentsPageSize);
+
+        page.forEach(function(r) {
+            var row = el('tr');
+            // Time
+            row.appendChild(el('td', {style: 'white-space:nowrap;font-size:0.85rem;'}, new Date(r[5] * 1000).toLocaleString()));
+
+            // Payer — clickable to filter
+            var payerCell = el('td', {className: 'address-cell'});
+            payerCell.appendChild(el('a', {href: 'https://gnosisscan.io/address/' + r[0], target: '_blank', className: 'seller-link'}, truncAddr(r[0])));
+            row.appendChild(payerCell);
+
+            // Payee — clickable to filter payments
+            var payeeCell = el('td', {className: 'address-cell'});
+            var payeeLink = el('a', {href: '#', className: 'seller-link',
+                onClick: (function(a) { return function(e) { e.preventDefault(); filterPaymentsBySeller(a); }; })(r[1])
+            }, truncAddr(r[1]));
+            payeeCell.appendChild(payeeLink);
+            // Enrich payee name
+            (function(link, addr) {
+                enrichSeller(addr).then(function(info) { if (info.name) link.textContent = info.name; });
+            })(payeeLink, r[1]);
+            row.appendChild(payeeCell);
+
+            // Amount
+            row.appendChild(el('td', {style: 'font-weight:600;color:var(--accent);white-space:nowrap;'}, formatCrc(r[3]) + ' CRC'));
+
+            // Reference (decoded from hex)
+            var ref = hexToUtf8(r[4]);
+            var refCell = el('td', {style: 'font-family:monospace;font-size:0.8rem;'});
+            refCell.appendChild(document.createTextNode(ref.length > 20 ? ref.slice(0, 20) + '...' : ref));
+            var refCp = el('button', {className: 'copy-btn', title: 'Copy reference', onClick: (function(t) { return function() { copyText(t); }; })(ref)});
+            refCp.appendChild(el('i', {className: 'fas fa-copy'}));
+            refCell.appendChild(refCp);
+            row.appendChild(refCell);
+
+            // Tx link
+            var txCell = el('td');
+            txCell.appendChild(el('a', {
+                href: 'https://gnosisscan.io/tx/' + r[6],
+                target: '_blank',
+                className: 'seller-link',
+                style: 'font-size:0.8rem;'
+            }, truncAddr(r[6])));
+            row.appendChild(txCell);
+
+            tbody.appendChild(row);
+        });
+        table.appendChild(tbody);
+        container.appendChild(table);
+
+        // Pagination
+        var totalPages = Math.ceil(allPayments.length / paymentsPageSize);
+        if (totalPages > 1) {
+            var pag = el('div', {className: 'pagination'});
+            pag.appendChild(el('button', {
+                className: 'btn btn-sm btn-outline',
+                disabled: paymentsPage <= 0 ? 'true' : undefined,
+                onClick: function() { paymentsPage--; renderPayments(); }
+            }, 'Prev'));
+            pag.appendChild(el('span', {}, 'Page ' + (paymentsPage + 1) + ' of ' + totalPages));
+            pag.appendChild(el('button', {
+                className: 'btn btn-sm btn-outline',
+                disabled: paymentsPage >= totalPages - 1 ? 'true' : undefined,
+                onClick: function() { paymentsPage++; renderPayments(); }
+            }, 'Next'));
+            container.appendChild(pag);
+        }
+    }
+
+    // ─── Cross-tab navigation helpers ────────────────────────────────
+    // Used by sellers table → payments, catalog → seller filter, etc.
+    function viewSellerPayments(addr) { filterPaymentsBySeller(addr); }
 
     // ─── Inventory ───────────────────────────────────────────────────
     function renderInventoryForm() {
