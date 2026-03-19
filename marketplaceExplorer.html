@@ -397,6 +397,7 @@
     var sellersList = [];
     var catalogCursor = null;
     var catalogItems = [];
+    var catalogFilterSeller = null; // when set, catalog shows only this seller
     var currentTab = 'catalog';
     var authToken = null;
     var authAddress = null;
@@ -507,7 +508,10 @@
             catalogCursor = null;
         }
 
-        var avatarParams = sellersList.map(function(s) {
+        var sellers = catalogFilterSeller
+            ? [{seller: catalogFilterSeller}]
+            : sellersList;
+        var avatarParams = sellers.map(function(s) {
             return 'avatars=' + encodeURIComponent(s.seller || s.address || s);
         }).join('&');
 
@@ -531,8 +535,37 @@
         }
     }
 
+    function filterCatalogBySeller(addr) {
+        catalogFilterSeller = addr;
+        switchTab('catalog');
+        loadCatalog(true);
+    }
+
+    function clearCatalogFilter() {
+        catalogFilterSeller = null;
+        loadCatalog(true);
+    }
+
     function renderCatalog() {
         var container = clearEl('catalogContent');
+
+        // Show filter banner if filtering
+        if (catalogFilterSeller) {
+            var banner = el('div', {style: 'display:flex;align-items:center;gap:8px;padding:8px 12px;background:#dbeafe;border-radius:6px;margin-bottom:12px;font-size:0.9rem;'});
+            banner.appendChild(el('i', {className: 'fas fa-filter', style: 'color:#1e40af;'}));
+            var info = sellerInfoCache[catalogFilterSeller.toLowerCase()];
+            var label = info && info.name ? info.name : truncAddr(catalogFilterSeller);
+            banner.appendChild(document.createTextNode('Filtered by seller: ' + label));
+            var clearBtn = el('button', {
+                className: 'btn btn-sm btn-outline',
+                style: 'margin-left:auto;',
+                onClick: clearCatalogFilter
+            });
+            clearBtn.appendChild(el('i', {className: 'fas fa-xmark', style: 'margin-right:4px;'}));
+            clearBtn.appendChild(document.createTextNode('Clear'));
+            banner.appendChild(clearBtn);
+            container.appendChild(banner);
+        }
 
         if (!catalogItems.length) {
             container.appendChild(el('div', {className: 'empty-state'}, 'No catalog items found.'));
@@ -665,32 +698,29 @@
             var actCell = el('td');
             row.appendChild(actCell);
 
+            // Actions: view products (filter catalog) + gnosisscan
+            var productsBtn = el('button', {
+                className: 'btn btn-sm btn-outline',
+                style: 'display:inline-flex;align-items:center;gap:4px;margin-right:6px;',
+                onClick: (function(a) { return function() { filterCatalogBySeller(a); }; })(addr)
+            });
+            productsBtn.appendChild(el('i', {className: 'fas fa-boxes-stacked'}));
+            productsBtn.appendChild(document.createTextNode(' Products'));
+            actCell.appendChild(productsBtn);
+
+            var scanBtn = el('a', {
+                className: 'btn btn-sm btn-outline',
+                href: 'https://gnosisscan.io/address/' + addr,
+                target: '_blank',
+                style: 'text-decoration:none;display:inline-flex;align-items:center;gap:4px;'
+            });
+            scanBtn.appendChild(el('i', {className: 'fas fa-arrow-up-right-from-square'}));
+            scanBtn.appendChild(document.createTextNode(' Gnosisscan'));
+            actCell.appendChild(scanBtn);
+
             enrichSeller(addr).then(function(info) {
                 infoCell.textContent = '';
                 renderSellerInfo(infoCell, info, addr);
-
-                // Actions: always show on-chain link, conditionally show CID history
-                var onChainBtn = el('a', {
-                    className: 'btn btn-sm btn-outline',
-                    href: 'profileChecker.html?address=' + addr,
-                    target: '_blank',
-                    style: 'text-decoration:none;display:inline-flex;align-items:center;gap:4px;margin-right:6px;'
-                });
-                onChainBtn.appendChild(el('i', {className: 'fas fa-link'}));
-                onChainBtn.appendChild(document.createTextNode(' On-chain'));
-                actCell.appendChild(onChainBtn);
-
-                if (info.hasCidHistory) {
-                    var cidBtn = el('a', {
-                        className: 'btn btn-sm btn-outline',
-                        href: 'profileHistory.html?address=' + addr,
-                        target: '_blank',
-                        style: 'text-decoration:none;display:inline-flex;align-items:center;gap:4px;'
-                    });
-                    cidBtn.appendChild(el('i', {className: 'fas fa-clock-rotate-left'}));
-                    cidBtn.appendChild(document.createTextNode(' CID History'));
-                    actCell.appendChild(cidBtn);
-                }
             });
 
             tbody.appendChild(row);
@@ -707,7 +737,7 @@
         var key = address.toLowerCase();
         if (sellerInfoCache[key]) return sellerInfoCache[key];
 
-        var info = { name: null, type: null, hasCidHistory: false };
+        var info = { name: null, type: null };
 
         // Profile name from pinning service
         try {
@@ -752,15 +782,6 @@
             }
         } catch (e) {}
 
-        // CID history availability (quick check)
-        try {
-            var histRes = await fetch('https://profiles.staging.aboutcircles.com/avatar/' + key + '/history?limit=1&offset=0');
-            if (histRes.ok) {
-                var histData = await histRes.json();
-                var entries = Array.isArray(histData) ? histData : (histData.history || []);
-                info.hasCidHistory = entries.length > 0;
-            }
-        } catch (e) {}
 
         sellerInfoCache[key] = info;
         return info;
