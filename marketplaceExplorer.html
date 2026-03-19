@@ -1178,7 +1178,11 @@
             var payerLink = el('a', {href: 'profileChecker.html?address=' + r[0], target: '_blank',
                 className: 'seller-link'}, truncAddr(r[0]));
             payerCell.appendChild(payerLink);
-            // Enrich payer name
+            payerCell.appendChild(document.createTextNode(' '));
+            var payerScan = el('a', {href: 'https://gnosisscan.io/address/' + r[0], target: '_blank',
+                title: 'Gnosisscan', style: 'color:var(--text-muted);font-size:0.75rem;'});
+            payerScan.appendChild(el('i', {className: 'fas fa-arrow-up-right-from-square'}));
+            payerCell.appendChild(payerScan);
             (function(link, addr) {
                 enrichSeller(addr).then(function(info) { if (info.name) link.textContent = info.name; });
             })(payerLink, r[0]);
