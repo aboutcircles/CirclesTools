@@ -681,9 +681,13 @@
             if (currency) priceStr += ' ' + currency;
             card.appendChild(el('div', {className: 'price'}, priceStr));
 
+            var sku = p.sku || item.sku || '';
+            if (sku) {
+                card.appendChild(el('div', {className: 'meta', style: 'font-family:monospace;font-size:0.8rem;'}, 'SKU: ' + sku));
+            }
+
             // Bottom meta section — consistent link style
             var sellerAddr = item.seller || p.seller || '';
-            var sku = p.sku || item.sku || '';
             var metaBottom = el('div', {style: 'margin-top:auto;padding-top:8px;border-top:1px solid var(--border);font-size:0.82rem;color:var(--text-muted);display:flex;flex-direction:column;gap:3px;'});
 
             if (sellerAddr) {
@@ -708,28 +712,22 @@
                     });
                 })(sellerLine, sellerLink, sellerAddr);
             }
-            if (sku) {
-                var skuLine = el('div', {style: 'display:flex;align-items:center;gap:6px;font-size:0.8rem;'});
-                skuLine.appendChild(el('span', {style: 'font-family:monospace;'}, sku));
-                // Availability badge (silent — shows only if feed works)
-                var availUrl = offer.availabilityFeed || null;
-                if (availUrl) {
-                    var badge = el('span', {style: 'margin-left:auto;'});
-                    skuLine.appendChild(badge);
-                    (function(b, url) {
-                        fetch(url).then(function(r) { return r.ok ? r.json() : null; }).then(function(data) {
-                            if (!data) return;
-                            var qty = data.available != null ? data.available : (data.quantity != null ? data.quantity : (data.inStock != null ? data.inStock : null));
-                            if (qty === true || (typeof qty === 'number' && qty > 0)) {
-                                b.appendChild(el('span', {style: 'font-size:0.7rem;padding:1px 6px;border-radius:8px;background:#dcfce7;color:#166534;'},
-                                    typeof qty === 'number' ? qty + ' avail' : 'In stock'));
-                            } else if (qty === false || qty === 0) {
-                                b.appendChild(el('span', {style: 'font-size:0.7rem;padding:1px 6px;border-radius:8px;background:#fee2e2;color:#991b1b;'}, 'Out of stock'));
-                            }
-                        }).catch(function() {});
-                    })(badge, availUrl);
-                }
-                metaBottom.appendChild(skuLine);
+            // Inventory badge — construct URL from seller + SKU
+            if (sku && sellerAddr) {
+                var invBadge = el('div', {style: 'font-size:0.8rem;'});
+                metaBottom.appendChild(invBadge);
+                (function(b, s, k) {
+                    var invUrl = apiBase + '/inventory/inventory/100/' + s + '/' + encodeURIComponent(k);
+                    fetch(invUrl).then(function(r) { return r.ok ? r.json() : null; }).then(function(data) {
+                        if (!data) return;
+                        var qty = data.value != null ? data.value : (data.quantity != null ? data.quantity : null);
+                        if (typeof qty === 'number') {
+                            var color = qty > 0 ? 'background:#dcfce7;color:#166534;' : 'background:#fee2e2;color:#991b1b;';
+                            b.appendChild(el('span', {style: 'font-size:0.7rem;padding:1px 6px;border-radius:8px;' + color},
+                                qty > 0 ? qty + ' in stock' : 'Out of stock'));
+                        }
+                    }).catch(function() {});
+                })(invBadge, sellerAddr, sku);
             }
             card.appendChild(metaBottom);
 

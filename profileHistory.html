@@ -634,7 +634,7 @@
         cidLine.appendChild(copyBtn);
         info.appendChild(cidLine);
 
-        var linkRow = el('div', {style: 'margin-top:6px;'});
+        var linkRow = el('div', {style: 'margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;'});
         var profileLink = el('a', {
             href: 'profileChecker.html?address=' + address,
             className: 'btn btn-sm btn-outline',
@@ -643,6 +643,15 @@
         profileLink.appendChild(el('i', {className: 'fas fa-user'}));
         profileLink.appendChild(document.createTextNode(' On-chain Profile'));
         linkRow.appendChild(profileLink);
+        var scanLink = el('a', {
+            href: 'https://gnosisscan.io/address/' + address,
+            target: '_blank',
+            className: 'btn btn-sm btn-outline',
+            style: 'text-decoration:none;display:inline-flex;align-items:center;gap:4px;'
+        });
+        scanLink.appendChild(el('i', {className: 'fas fa-arrow-up-right-from-square'}));
+        scanLink.appendChild(document.createTextNode(' Gnosisscan'));
+        linkRow.appendChild(scanLink);
         info.appendChild(linkRow);
 
         card.appendChild(info);
