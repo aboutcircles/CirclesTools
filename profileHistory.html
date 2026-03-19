@@ -6,6 +6,19 @@
     <title>Profile CID History</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
+    <script>
+    var ethersLoaded = false;
+    function loadEthers() {
+        if (ethersLoaded) return Promise.resolve();
+        return new Promise(function(resolve, reject) {
+            var s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js';
+            s.onload = function() { ethersLoaded = true; resolve(); };
+            s.onerror = reject;
+            document.head.appendChild(s);
+        });
+    }
+    </script>
     <style>
         :root {
             --primary: #191568;
@@ -343,6 +356,23 @@
             cursor: pointer;
         }
         .cid-inspect-link:hover { text-decoration-style: solid; color: var(--accent); }
+        .btn-restore {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: background 0.2s;
+        }
+        .btn-restore:hover { background: #e0400f; }
+        .btn-restore:disabled { opacity: 0.5; cursor: not-allowed; }
 
         @media (max-width: 600px) {
             .diff-container { grid-template-columns: 1fr; }
@@ -877,6 +907,19 @@
         var cid = entry.cid || entry.cidV0 || '';
         var label = idx === 0 ? 'Current' : '#' + (idx + 1);
         openPanel(label + ' \u2014 ' + cid, cid);
+
+        // Show restore button for non-current entries
+        var actions = document.querySelector('.inspect-header .header-actions');
+        var oldRestore = document.getElementById('restoreBtn');
+        if (oldRestore) oldRestore.remove();
+        if (idx > 0 && cid) {
+            var restoreBtn = el('button', {className: 'btn-restore', id: 'restoreBtn',
+                onClick: (function(c) { return function() { restoreProfile(c); }; })(cid)});
+            restoreBtn.appendChild(el('i', {className: 'fas fa-rotate-left'}));
+            restoreBtn.appendChild(document.createTextNode(' Restore'));
+            actions.insertBefore(restoreBtn, actions.firstChild);
+        }
+
         panelLoading();
         try {
             var content = await fetchCidContent(cid);
@@ -998,6 +1041,77 @@
         container.appendChild(sideA);
         container.appendChild(sideB);
         body.appendChild(container);
+    }
+
+    // ─── Profile Restore (rollback CID on-chain) ─────────────────────
+    var NAME_REGISTRY = '0xA27566fD89162cC3D40Cb59c87AAaA49B85F3474';
+    var NAME_REGISTRY_ABI = ['function updateMetadataDigest(bytes32 _metadataDigest)'];
+
+    // Base58 decoder (CIDv0 uses base58btc)
+    var B58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+    function base58Decode(str) {
+        var bytes = [0];
+        for (var i = 0; i < str.length; i++) {
+            var c = B58_ALPHABET.indexOf(str[i]);
+            if (c < 0) throw new Error('Invalid base58 char: ' + str[i]);
+            for (var j = 0; j < bytes.length; j++) bytes[j] *= 58;
+            bytes[0] += c;
+            var carry = 0;
+            for (var j = 0; j < bytes.length; j++) {
+                bytes[j] += carry;
+                carry = (bytes[j] >> 8);
+                bytes[j] &= 0xff;
+            }
+            while (carry) { bytes.push(carry & 0xff); carry >>= 8; }
+        }
+        for (var i = 0; i < str.length && str[i] === '1'; i++) bytes.push(0);
+        return new Uint8Array(bytes.reverse());
+    }
+
+    function cidV0ToBytes32(cidV0) {
+        var raw = base58Decode(cidV0);
+        if (raw.length < 34 || raw[0] !== 0x12 || raw[1] !== 0x20)
+            throw new Error('Invalid CIDv0 format');
+        var digest = raw.slice(2, 34);
+        return '0x' + Array.from(digest).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+    }
+
+    async function restoreProfile(cid) {
+        if (!cid || !currentAddress) return;
+        if (!confirm('Restore profile to CID:\n' + cid + '\n\nThis will update your on-chain profile metadata. You must be the owner of address ' + currentAddress + '.'))
+            return;
+
+        var restoreBtn = document.getElementById('restoreBtn');
+        if (restoreBtn) { restoreBtn.disabled = true; restoreBtn.textContent = 'Connecting...'; }
+
+        try {
+            await loadEthers();
+            if (!window.ethereum) throw new Error('No wallet found. Install MetaMask or similar.');
+
+            var provider = new ethers.providers.Web3Provider(window.ethereum);
+            await provider.send('eth_requestAccounts', []);
+            var signer = provider.getSigner();
+            var signerAddr = await signer.getAddress();
+
+            if (signerAddr.toLowerCase() !== currentAddress.toLowerCase())
+                throw new Error('Connected wallet (' + signerAddr.slice(0,6) + '...) does not match profile address (' + currentAddress.slice(0,6) + '...).');
+
+            if (restoreBtn) restoreBtn.textContent = 'Sending tx...';
+            var bytes32 = cidV0ToBytes32(cid);
+            var contract = new ethers.Contract(NAME_REGISTRY, NAME_REGISTRY_ABI, signer);
+            var tx = await contract.updateMetadataDigest(bytes32);
+
+            if (restoreBtn) restoreBtn.textContent = 'Confirming...';
+            await tx.wait();
+
+            if (restoreBtn) { restoreBtn.textContent = 'Restored!'; restoreBtn.style.background = 'var(--success)'; }
+            setTimeout(function() { checkHistory(); }, 2000);
+        } catch (err) {
+            console.error('Restore failed:', err);
+            if (restoreBtn) { restoreBtn.disabled = false; restoreBtn.textContent = 'Restore'; }
+            var body = document.getElementById('inspectBody');
+            if (body) body.appendChild(el('div', {className: 'error-msg', style: 'margin-top:8px;'}, 'Restore failed: ' + (err.reason || err.message)));
+        }
     }
     </script>
 </body>
