@@ -335,9 +335,9 @@
             <h1><i class="fas fa-store" style="margin-right: 8px;"></i>Marketplace Explorer</h1>
         </div>
         <div class="header-right">
-            <div class="wallet-status" id="walletStatus">
+            <div class="wallet-status" id="walletStatus" style="display:none;">
                 <span class="dot" id="walletDot"></span>
-                <span id="walletText">Not connected</span>
+                <span id="walletText"></span>
             </div>
             <div class="header-links">
                 <a href="index.html"><i class="fas fa-home"></i> Tools</a>
@@ -410,8 +410,9 @@
             document.getElementById('apiUrlDisplay').textContent = apiBase;
             // Reset and reload
             authToken = null; authAddress = null; signer = null; provider = null;
+            document.getElementById('walletStatus').style.display = 'none';
             document.getElementById('walletDot').classList.remove('connected');
-            document.getElementById('walletText').textContent = 'Not connected';
+            document.getElementById('walletText').textContent = '';
             catalogItems = []; catalogCursor = null; sellersList = [];
             loadSellersAndCatalog();
             renderInventoryForm();
@@ -770,6 +771,7 @@
     }
 
     function updateWalletStatus(address, authed) {
+        document.getElementById('walletStatus').style.display = '';
         document.getElementById('walletDot').classList.add('connected');
         document.getElementById('walletText').textContent = truncAddr(address) + (authed ? ' (authed)' : '');
     }
