@@ -487,9 +487,18 @@
     }
 
     async function fetchCidContent(cid) {
+        // Try /get first (shaped profile response), fall back to /raw/:cid
+        // which fetches from IPFS gateway for GC'd CIDs and re-caches them
         var res = await fetch(apiBase + '/get?cid=' + encodeURIComponent(cid));
-        if (!res.ok) throw new Error('CID content fetch failed: ' + res.status);
-        return res.json();
+        if (res.ok) return res.json();
+
+        var rawRes = await fetch(apiBase + '/raw/' + encodeURIComponent(cid));
+        if (rawRes.ok) {
+            var data = await rawRes.json();
+            data._source = 'raw';
+            return data;
+        }
+        throw new Error('CID unavailable (/get: ' + res.status + ', /raw: ' + rawRes.status + ')');
     }
 
     // ─── Main flow ───────────────────────────────────────────────────
@@ -756,7 +765,14 @@
     function renderJsonWithPreviews(obj) {
         var body = document.getElementById('inspectBody');
         body.textContent = '';
-        // Walk keys, render each as a row; if value is base64 image, show preview
+        // Show IPFS gateway fallback notice
+        if (obj && obj._source === 'raw') {
+            var notice = el('div', {style: 'padding:6px 10px;background:#fef3c7;border-radius:4px;font-size:0.82rem;color:#92400e;margin-bottom:8px;'});
+            notice.appendChild(el('i', {className: 'fas fa-triangle-exclamation', style: 'margin-right:6px;'}));
+            notice.appendChild(document.createTextNode('Fetched via /raw fallback (CID was GC\'d, re-fetched from IPFS gateway)'));
+            body.appendChild(notice);
+            delete obj._source;
+        }
         if (typeof obj !== 'object' || obj === null) {
             body.appendChild(el('pre', {}, JSON.stringify(obj, null, 2)));
             return;
