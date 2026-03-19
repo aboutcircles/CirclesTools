@@ -674,6 +674,27 @@
             if (sku) {
                 metaBottom.appendChild(el('div', {style: 'font-family:monospace;font-size:0.8rem;'}, sku));
             }
+            // Availability badge — lazy fetch from feed URL if available
+            var availFeed = offer.availabilityFeed || null;
+            if (availFeed) {
+                var availBadge = el('div', {style: 'margin-top:4px;'});
+                availBadge.appendChild(el('span', {style: 'font-size:0.75rem;color:var(--text-muted);'}, 'checking stock...'));
+                metaBottom.appendChild(availBadge);
+                (function(badge, url) {
+                    fetch(url).then(function(r) { return r.ok ? r.json() : null; }).then(function(data) {
+                        badge.textContent = '';
+                        if (!data) return;
+                        var avail = typeof data === 'object' ? (data.available || data.inStock || data.quantity) : data;
+                        if (avail === true || avail > 0) {
+                            badge.appendChild(el('span', {style: 'font-size:0.75rem;padding:2px 6px;border-radius:8px;background:#dcfce7;color:#166534;'}, 'In stock'));
+                        } else if (avail === false || avail === 0) {
+                            badge.appendChild(el('span', {style: 'font-size:0.75rem;padding:2px 6px;border-radius:8px;background:#fee2e2;color:#991b1b;'}, 'Out of stock'));
+                        } else {
+                            badge.appendChild(el('span', {style: 'font-size:0.75rem;color:var(--text-muted);'}, 'Stock: ' + JSON.stringify(data)));
+                        }
+                    }).catch(function() { badge.textContent = ''; });
+                })(availBadge, availFeed);
+            }
             card.appendChild(metaBottom);
 
             grid.appendChild(card);
