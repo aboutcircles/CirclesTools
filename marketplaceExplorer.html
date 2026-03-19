@@ -1175,16 +1175,21 @@
 
             // Payer — clickable to filter
             var payerCell = el('td', {className: 'address-cell'});
-            payerCell.appendChild(el('a', {href: 'https://gnosisscan.io/address/' + r[0], target: '_blank', className: 'seller-link'}, truncAddr(r[0])));
+            var payerLink = el('a', {href: 'profileChecker.html?address=' + r[0], target: '_blank',
+                className: 'seller-link'}, truncAddr(r[0]));
+            payerCell.appendChild(payerLink);
+            // Enrich payer name
+            (function(link, addr) {
+                enrichSeller(addr).then(function(info) { if (info.name) link.textContent = info.name; });
+            })(payerLink, r[0]);
             row.appendChild(payerCell);
 
-            // Payee — clickable to filter payments
+            // Payee — link to seller card
             var payeeCell = el('td', {className: 'address-cell'});
             var payeeLink = el('a', {href: '#', className: 'seller-link',
-                onClick: (function(a) { return function(e) { e.preventDefault(); filterPaymentsBySeller(a); }; })(r[1])
+                onClick: (function(a) { return function(e) { e.preventDefault(); scrollToSeller(a); }; })(r[1])
             }, truncAddr(r[1]));
             payeeCell.appendChild(payeeLink);
-            // Enrich payee name
             (function(link, addr) {
                 enrichSeller(addr).then(function(info) { if (info.name) link.textContent = info.name; });
             })(payeeLink, r[1]);
