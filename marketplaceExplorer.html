@@ -611,8 +611,8 @@
                 sellerRow.appendChild(document.createTextNode('Seller: '));
                 var sellerLink = el('a', {
                     className: 'seller-link',
-                    href: 'profileChecker.html?address=' + sellerAddr,
-                    target: '_blank'
+                    href: '#',
+                    onClick: (function(a) { return function(e) { e.preventDefault(); filterCatalogBySeller(a); }; })(sellerAddr)
                 }, truncAddr(sellerAddr));
                 sellerRow.appendChild(sellerLink);
                 card.appendChild(sellerRow);
