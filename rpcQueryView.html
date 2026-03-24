@@ -1653,7 +1653,7 @@
         },
         circles_query: {
             category: 'query',
-            description: 'Generic database query using structured DTOs',
+            description: 'Generic database query (returns bare rows array, backwards compatible)',
             params: [
                 { name: 'namespace', type: 'string', required: true, description: 'Database namespace' },
                 { name: 'table', type: 'string', required: true, description: 'Table name' },
@@ -1847,7 +1847,7 @@
         },
         circles_paginated_query: {
             category: 'query',
-            description: 'Execute a structured query with cursor-based pagination (returns hasMore + nextCursor)',
+            description: 'Paginated query returning {rows, hasMore, nextCursor} wrapper',
             isQueryBuilder: true,
             params: [
                 { name: 'query', type: 'object', required: true, description: 'SelectDto query definition' },
@@ -1886,6 +1886,7 @@
         ],
         query: [
             { name: 'Query Avatars Table', method: 'circles_query', params: { namespace: 'V_Crc', table: 'Avatars', limit: 50 } },
+            { name: 'Paginated Avatars Query', method: 'circles_paginated_query', params: { namespace: 'V_Crc', table: 'Avatars', limit: 10 } },
             { name: 'Recent V2 Transfers', method: 'circles_events', params: { eventTypes: ['CrcV2_TransferSingle'] } },
             { name: 'TransferData Events', method: 'circles_events', params: { eventTypes: ['CrcV2_TransferData'] } },
             { name: 'List All Tables', method: 'circles_tables', params: {} }
