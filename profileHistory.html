@@ -1055,7 +1055,7 @@
     }
 
     // ─── Profile Restore (rollback CID on-chain) ─────────────────────
-    var NAME_REGISTRY = '0xA27566fD89162cC3D40Cb59c87AAaA49B85F3474';
+    var NAME_REGISTRY = '0xA27566fD89162cC3D40Cb59c87AAaA49B85F3474'; // Gnosis Chain (100)
     var NAME_REGISTRY_ABI = ['function updateMetadataDigest(bytes32 _metadataDigest)'];
 
     // Base58 decoder (CIDv0 uses base58btc)
@@ -1110,6 +1110,8 @@
 
         var provider = new ethers.providers.Web3Provider(window.ethereum);
         await provider.send('eth_requestAccounts', []);
+        var network = await provider.getNetwork();
+        if (network.chainId !== 100) throw new Error('Please switch to Gnosis Chain (chain ID 100). Currently on chain ' + network.chainId);
         connectedSigner = provider.getSigner();
         var addr = await connectedSigner.getAddress();
         showWallet(addr);
