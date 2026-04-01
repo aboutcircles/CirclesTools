@@ -1147,16 +1147,19 @@
                 var label = info && info.name ? info.name : truncAddr(paymentFilterSeller);
                 banner.appendChild(document.createTextNode('Payments to: ' + label + ' '));
             }
-            var jumpProducts = el('button', {className: 'btn btn-sm btn-outline', style: 'margin-left:8px;',
-                onClick: (function(a) { return function() { filterCatalogBySeller(a); }; })(paymentFilterSeller)});
-            jumpProducts.appendChild(el('i', {className: 'fas fa-boxes-stacked', style: 'margin-right:4px;'}));
-            jumpProducts.appendChild(document.createTextNode('Products'));
-            banner.appendChild(jumpProducts);
-            var jumpScan = el('a', {className: 'btn btn-sm btn-outline', href: 'https://gnosisscan.io/address/' + paymentFilterSeller,
-                target: '_blank', style: 'text-decoration:none;margin-left:4px;'});
-            jumpScan.appendChild(el('i', {className: 'fas fa-arrow-up-right-from-square', style: 'margin-right:4px;'}));
-            jumpScan.appendChild(document.createTextNode('Gnosisscan'));
-            banner.appendChild(jumpScan);
+            // Only show seller-specific links when filtering by seller (not gateway-only)
+            if (paymentFilterSeller) {
+                var jumpProducts = el('button', {className: 'btn btn-sm btn-outline', style: 'margin-left:8px;',
+                    onClick: (function(a) { return function() { filterCatalogBySeller(a); }; })(paymentFilterSeller)});
+                jumpProducts.appendChild(el('i', {className: 'fas fa-boxes-stacked', style: 'margin-right:4px;'}));
+                jumpProducts.appendChild(document.createTextNode('Products'));
+                banner.appendChild(jumpProducts);
+                var jumpScan = el('a', {className: 'btn btn-sm btn-outline', href: 'https://gnosisscan.io/address/' + paymentFilterSeller,
+                    target: '_blank', style: 'text-decoration:none;margin-left:4px;'});
+                jumpScan.appendChild(el('i', {className: 'fas fa-arrow-up-right-from-square', style: 'margin-right:4px;'}));
+                jumpScan.appendChild(document.createTextNode('Gnosisscan'));
+                banner.appendChild(jumpScan);
+            }
             var clearBtn = el('button', {className: 'btn btn-sm btn-outline', style: 'margin-left:auto;', onClick: clearPaymentFilter});
             clearBtn.appendChild(el('i', {className: 'fas fa-xmark', style: 'margin-right:4px;'}));
             clearBtn.appendChild(document.createTextNode('Clear'));

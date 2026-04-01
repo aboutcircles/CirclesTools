@@ -982,6 +982,8 @@
                 fetchCidContent(cidA),
                 fetchCidContent(cidB)
             ]);
+            // Strip _source metadata before diffing
+            delete contentA._source; delete contentB._source;
             renderDiff(contentA, contentB, cidA, cidB, idxA, idxB);
         } catch (err) {
             var body = document.getElementById('inspectBody');
