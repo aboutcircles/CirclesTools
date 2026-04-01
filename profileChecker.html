@@ -638,7 +638,7 @@
                     const mainSCRC = erc20Map[inputAddress.toLowerCase()]?.demurragedERC20; // sCRC (inflationary/static)
                     let summaryHtml = '';
                     summaryHtml += `<div class="info"><strong>Address:</strong> <span id="main-user-name">Loading...</span> <a href="profileHistory.html?address=${inputAddress}" style="font-size:0.85rem;color:#191568;margin-left:8px;" title="View CID History">CID History &rarr;</a></div>`;
-                    summaryHtml += `<div class="info" style="display:flex;gap:8px;margin-top:6px;"><a href="#trustSection" style="font-size:0.85rem;color:#191568;">Trust Connections &darr;</a><a href="#tokenBalancesSection" style="font-size:0.85rem;color:#191568;">Token Balances &darr;</a></div>`;
+                    summaryHtml += `<div id="topSection" class="info" style="display:flex;gap:8px;margin-top:6px;"><a href="#trustSection" style="font-size:0.85rem;color:#191568;">Trust Connections &darr;</a><a href="#tokenBalancesSection" style="font-size:0.85rem;color:#191568;">Token Balances &darr;</a></div>`;
                     summaryHtml += `<div class="info"><strong>Price:</strong> $<span id="main-user-price">...</span> / CRC</div>`;
                     // V1 Info
                     summaryHtml += `<div class="info"><strong>[V1] Status:</strong> ${v1Data.isHuman ? 'human' : (v1Data.isOrg ? 'org' : 'none')}</div>`;
@@ -758,6 +758,21 @@
                     if (trustedAddressesData.length > 0) {
                         const trustAnchor = document.createElement("div");
                         trustAnchor.id = "trustSection";
+                        trustAnchor.style.cssText = 'display:flex;align-items:center;gap:8px;margin-top:16px;';
+                        const trustLabel = document.createElement("strong");
+                        trustLabel.textContent = "Trust Connections";
+                        trustLabel.style.fontSize = "1.1rem";
+                        trustAnchor.appendChild(trustLabel);
+                        const trustTopLink = document.createElement("a");
+                        trustTopLink.href = "#topSection";
+                        trustTopLink.style.cssText = "font-size:0.8rem;color:#191568;";
+                        trustTopLink.textContent = "\u2191 Top";
+                        trustAnchor.appendChild(trustTopLink);
+                        const trustTokenLink = document.createElement("a");
+                        trustTokenLink.href = "#tokenBalancesSection";
+                        trustTokenLink.style.cssText = "font-size:0.8rem;color:#191568;";
+                        trustTokenLink.textContent = "Token Balances \u2193";
+                        trustAnchor.appendChild(trustTokenLink);
                         resultDiv.appendChild(trustAnchor);
                         const table = document.createElement("table");
                         const thead = document.createElement("thead");
@@ -1077,6 +1092,11 @@
                 const heading = document.createElement('h3');
                 heading.style.cssText = 'margin-top:24px;font-size:1.1rem;';
                 heading.textContent = 'Token Balances ';
+                const topLink = document.createElement('a');
+                topLink.href = '#topSection';
+                topLink.style.cssText = 'font-size:0.8rem;color:#191568;margin-left:8px;font-weight:400;';
+                topLink.textContent = '\u2191 Top';
+                heading.appendChild(topLink);
                 const spinner = document.createElement('span');
                 spinner.className = 'loader';
                 spinner.id = 'tokenLoader';
