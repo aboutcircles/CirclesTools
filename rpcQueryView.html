@@ -1436,7 +1436,7 @@
         },
         circles_getTokenBalances: {
             category: 'balance',
-            description: 'Get all token balances with full metadata for an address',
+            description: 'Get all token balances with full metadata. Response includes isWrapped, isGroup, isInflationary, tokenType flags for client-side filtering (wrapped vs unwrapped, group, v1).',
             params: [
                 { name: 'address', type: 'address', required: true, description: 'Address to get balances for' }
             ]
@@ -1859,7 +1859,8 @@
         balance: [
             { name: 'Get V2 Total Balance', method: 'circlesV2_getTotalBalance', params: { address: '' } },
             { name: 'Get V1 Total Balance', method: 'circles_getTotalBalance', params: { address: '' } },
-            { name: 'Get All Token Balances', method: 'circles_getTokenBalances', params: { address: '' } }
+            { name: 'Get All Token Balances', method: 'circles_getTokenBalances', params: { address: '' } },
+            { name: 'Token Balances (example address)', method: 'circles_getTokenBalances', params: { address: '0x42cEDde51198D1773590311E2A340DC06B24cB37' } }
         ],
         avatar: [
             { name: 'Get Avatar Info', method: 'circles_getAvatarInfo', params: { address: '' } },
