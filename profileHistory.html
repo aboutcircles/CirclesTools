@@ -684,7 +684,7 @@
         linkRow.appendChild(profileLink);
         var scanLink = el('a', {
             href: 'https://gnosisscan.io/address/' + address,
-            target: '_blank',
+            target: '_blank', rel: 'noopener noreferrer',
             className: 'btn btn-sm btn-outline',
             style: 'text-decoration:none;display:inline-flex;align-items:center;gap:4px;'
         });
