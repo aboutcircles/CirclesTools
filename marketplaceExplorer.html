@@ -626,7 +626,7 @@
             jumpPayments.appendChild(document.createTextNode('Payments'));
             banner.appendChild(jumpPayments);
             var jumpScan = el('a', {className: 'btn btn-sm btn-outline', href: 'https://gnosisscan.io/address/' + catalogFilterSeller,
-                target: '_blank', style: 'text-decoration:none;margin-left:4px;'});
+                target: '_blank', rel: 'noopener noreferrer', style: 'text-decoration:none;margin-left:4px;'});
             jumpScan.appendChild(el('i', {className: 'fas fa-arrow-up-right-from-square', style: 'margin-right:4px;'}));
             jumpScan.appendChild(document.createTextNode('Gnosisscan'));
             banner.appendChild(jumpScan);
@@ -806,7 +806,7 @@
             actions.appendChild(payBtn);
 
             var scanBtn = el('a', {className: 'btn btn-sm btn-outline',
-                href: 'https://gnosisscan.io/address/' + addr, target: '_blank',
+                href: 'https://gnosisscan.io/address/' + addr, target: '_blank', rel: 'noopener noreferrer',
                 style: 'text-decoration:none;' + btnStyle});
             scanBtn.appendChild(el('i', {className: 'fas fa-arrow-up-right-from-square'}));
             scanBtn.appendChild(document.createTextNode(' Gnosisscan'));
@@ -1161,7 +1161,7 @@
                 jumpProducts.appendChild(document.createTextNode('Products'));
                 banner.appendChild(jumpProducts);
                 var jumpScan = el('a', {className: 'btn btn-sm btn-outline', href: 'https://gnosisscan.io/address/' + paymentFilterSeller,
-                    target: '_blank', style: 'text-decoration:none;margin-left:4px;'});
+                    target: '_blank', rel: 'noopener noreferrer', style: 'text-decoration:none;margin-left:4px;'});
                 jumpScan.appendChild(el('i', {className: 'fas fa-arrow-up-right-from-square', style: 'margin-right:4px;'}));
                 jumpScan.appendChild(document.createTextNode('Gnosisscan'));
                 banner.appendChild(jumpScan);
@@ -1246,11 +1246,11 @@
 
             // Payer — clickable to filter
             var payerCell = el('td', {className: 'address-cell'});
-            var payerLink = el('a', {href: 'profileChecker.html?address=' + r[0], target: '_blank',
+            var payerLink = el('a', {href: 'profileChecker.html?address=' + r[0], target: '_blank', rel: 'noopener noreferrer',
                 className: 'seller-link'}, truncAddr(r[0]));
             payerCell.appendChild(payerLink);
             payerCell.appendChild(document.createTextNode(' '));
-            var payerScan = el('a', {href: 'https://gnosisscan.io/address/' + r[0], target: '_blank',
+            var payerScan = el('a', {href: 'https://gnosisscan.io/address/' + r[0], target: '_blank', rel: 'noopener noreferrer',
                 title: 'Gnosisscan', style: 'color:var(--text-muted);font-size:0.75rem;'});
             payerScan.appendChild(el('i', {className: 'fas fa-arrow-up-right-from-square'}));
             payerCell.appendChild(payerScan);
@@ -1286,7 +1286,7 @@
             var txCell = el('td');
             txCell.appendChild(el('a', {
                 href: 'https://gnosisscan.io/tx/' + r[6],
-                target: '_blank',
+                target: '_blank', rel: 'noopener noreferrer',
                 className: 'seller-link',
                 style: 'font-size:0.8rem;'
             }, truncAddr(r[6])));
