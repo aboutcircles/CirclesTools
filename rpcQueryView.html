@@ -1212,11 +1212,10 @@
             <div class="server-select">
                 <label>Server:</label>
                 <select id="serverSelect" onchange="onServerChange()">
-                    <option value="staging2">Staging2 (New)</option>
-                    <option value="staging">Staging</option>
                     <option value="prod">Production</option>
+                    <option value="staging">Staging</option>
                 </select>
-                <span class="server-url" id="serverUrl">staging.circlesubi.network</span>
+                <span class="server-url" id="serverUrl">rpc.aboutcircles.com</span>
             </div>
             <div class="server-status" id="serverStatus">
                 <span class="status-dot loading"></span>
@@ -1395,17 +1394,11 @@
     <script>
     // Server Configuration
     const SERVERS = {
-        staging2: {
-            name: 'Staging2 (New)',
-            rpc: 'https://staging.circlesubi.network/',
-            pathfinder: 'https://staging.circlesubi.network/',  // Also on root
-            chainRpc: 'https://rpc.gnosischain.com'
-        },
         staging: {
             name: 'Staging',
-            rpc: 'https://rpc.circlesubi.network/',
-            pathfinder: 'https://rpc.circlesubi.network/',
-            chainRpc: 'https://rpc.circlesubi.network/'
+            rpc: 'https://staging.aboutcircles.com/',
+            pathfinder: 'https://staging.aboutcircles.com/',
+            chainRpc: 'https://rpc.gnosischain.com'
         },
         prod: {
             name: 'Production',
@@ -1415,7 +1408,7 @@
         }
     };
 
-    let currentServer = 'staging2';
+    let currentServer = 'prod';
     let currentMethod = null;
     let lastResult = null;
     let lastRequest = null;
@@ -1549,8 +1542,8 @@
         },
         circles_findGroups: {
             category: 'trust',
-            description: 'Find groups with filters (staging2 only)',
-            serverNote: 'Only available on Staging2',
+            description: 'Find groups with filters (staging only)',
+            serverNote: 'Only available on Staging',
             params: [
                 { name: 'limit', type: 'number', required: false, default: 50, description: 'Max results' },
                 { name: 'queryParams', type: 'object', required: false, description: 'Filter params (nameStartsWith, symbolStartsWith, ownerIn)' },
@@ -2061,11 +2054,6 @@
         initSidebarResize();  // Setup sidebar collapse/resize
         loadHistory();
         loadLayoutPreference();  // This calls updateGridColumns()
-        // Set initial server URL display
-        var server = SERVERS[currentServer];
-        document.getElementById('serverUrl').textContent = server.rpc.replace('https://', '').replace(/\/$/, '');
-        checkServerStatus();
-
         document.addEventListener('keydown', function(e) {
             if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
                 e.preventDefault();
@@ -2073,16 +2061,17 @@
             }
         });
 
-        // URL query parameter support: ?method=circlesV2_findPath&server=staging2
+        // URL query parameter support: ?method=circlesV2_findPath&server=staging
         var urlParams = new URLSearchParams(window.location.search);
         var paramServer = urlParams.get('server');
         if (paramServer && SERVERS[paramServer]) {
             currentServer = paramServer;
             document.getElementById('serverSelect').value = paramServer;
-            var server = SERVERS[paramServer];
-            document.getElementById('serverUrl').textContent = server.rpc.replace('https://', '').replace(/\/$/, '');
-            checkServerStatus();
         }
+        // Set server URL display and check status once (after param override)
+        var server = SERVERS[currentServer];
+        document.getElementById('serverUrl').textContent = server.rpc.replace('https://', '').replace(/\/$/, '');
+        checkServerStatus();
         var paramMethod = urlParams.get('method');
         if (paramMethod && METHODS[paramMethod]) {
             // Find the sidebar item and select it

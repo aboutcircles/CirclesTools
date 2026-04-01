@@ -204,6 +204,62 @@
             strong {
                 font-weight: 600;
             }
+            /* Token Balances Section */
+            .token-summary {
+                display: flex;
+                gap: 12px;
+                flex-wrap: wrap;
+                margin: 20px 0 12px;
+            }
+            .token-summary-card {
+                background: #fff;
+                border: 1px solid #e5e3fb;
+                border-radius: 8px;
+                padding: 10px 14px;
+                min-width: 110px;
+            }
+            .token-summary-card .label {
+                font-size: 0.78rem;
+                color: #666;
+                margin-bottom: 2px;
+            }
+            .token-summary-card .value {
+                font-size: 1.15rem;
+                font-weight: 700;
+                color: #191568;
+            }
+            .token-filters {
+                display: flex;
+                gap: 6px;
+                margin-bottom: 10px;
+                flex-wrap: wrap;
+            }
+            .token-filter-btn {
+                padding: 4px 12px;
+                border: 1px solid #e5e3fb;
+                border-radius: 16px;
+                background: transparent;
+                font-family: inherit;
+                font-size: 0.82rem;
+                cursor: pointer;
+                transition: all 0.2s;
+                color: #191568;
+            }
+            .token-filter-btn:hover { background: #f0eef9; }
+            .token-filter-btn.active { background: #191568; color: #fff; border-color: #191568; }
+            .type-badge {
+                display: inline-block;
+                font-size: 0.72rem;
+                padding: 1px 6px;
+                border-radius: 8px;
+                font-weight: 600;
+            }
+            .type-badge.human { background: #dcfce7; color: #166534; }
+            .type-badge.group { background: #e0e7ff; color: #3730a3; }
+            .type-badge.wrapped { background: #dbeafe; color: #1e40af; }
+            .type-badge.v1 { background: #f3f4f6; color: #374151; }
+            th.sortable { cursor: pointer; user-select: none; }
+            th.sortable:hover { background: #d5d2f5; }
             .loader {
                 border: 4px solid #f3f3f3;
                 border-top: 4px solid #191568;
@@ -581,7 +637,7 @@
                     // and demurragedERC20 is actually the static/inflationary sCRC token.
                     const mainSCRC = erc20Map[inputAddress.toLowerCase()]?.demurragedERC20; // sCRC (inflationary/static)
                     let summaryHtml = '';
-                    summaryHtml += `<div class="info"><strong>Address:</strong> <span id="main-user-name">Loading...</span></div>`;
+                    summaryHtml += `<div id="topSection" class="info" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><strong>Address:</strong> <span id="main-user-name">Loading...</span><span style="margin-left:auto;display:flex;gap:8px;font-size:0.85rem;"><a href="profileHistory.html?address=${inputAddress}" style="color:#191568;">CID History &rarr;</a><a href="#trustSection" style="color:#191568;">Trust &darr;</a><a href="#tokenBalancesSection" style="color:#191568;">Balances &darr;</a></span></div>`;
                     summaryHtml += `<div class="info"><strong>Price:</strong> $<span id="main-user-price">...</span> / CRC</div>`;
                     // V1 Info
                     summaryHtml += `<div class="info"><strong>[V1] Status:</strong> ${v1Data.isHuman ? 'human' : (v1Data.isOrg ? 'org' : 'none')}</div>`;
@@ -699,6 +755,24 @@
                     // For large lists (>100), skip per-row async calls (price, bot, balancer)
                     const isLargeList = trustedAddressesData.length > 100;
                     if (trustedAddressesData.length > 0) {
+                        const trustAnchor = document.createElement("div");
+                        trustAnchor.id = "trustSection";
+                        trustAnchor.style.cssText = 'display:flex;align-items:center;gap:8px;margin-top:16px;';
+                        const trustLabel = document.createElement("strong");
+                        trustLabel.textContent = "Trust Connections";
+                        trustLabel.style.fontSize = "1.1rem";
+                        trustAnchor.appendChild(trustLabel);
+                        const trustTopLink = document.createElement("a");
+                        trustTopLink.href = "#topSection";
+                        trustTopLink.style.cssText = "font-size:0.8rem;color:#191568;";
+                        trustTopLink.textContent = "\u2191 Top";
+                        trustAnchor.appendChild(trustTopLink);
+                        const trustTokenLink = document.createElement("a");
+                        trustTokenLink.href = "#tokenBalancesSection";
+                        trustTokenLink.style.cssText = "font-size:0.8rem;color:#191568;";
+                        trustTokenLink.textContent = "Token Balances \u2193";
+                        trustAnchor.appendChild(trustTokenLink);
+                        resultDiv.appendChild(trustAnchor);
                         const table = document.createElement("table");
                         const thead = document.createElement("thead");
                         const headerRow = document.createElement("tr");
@@ -896,9 +970,17 @@
                                 getBotClassification(trustedAddr).then(botData => {
                                     if (botData) {
                                         if (botData.is_bot) {
-                                            botCell.innerHTML = `<span style="color: #cc0000;">Bot (${botData.category})</span>`;
+                                            const s = document.createElement('span');
+                                            s.style.color = '#cc0000';
+                                            s.textContent = 'Bot (' + (botData.category || 'unknown') + ')';
+                                            botCell.textContent = '';
+                                            botCell.appendChild(s);
                                         } else {
-                                            botCell.innerHTML = `<span style="color: #006600;">Human</span>`;
+                                            const s = document.createElement('span');
+                                            s.style.color = '#006600';
+                                            s.textContent = 'Human';
+                                            botCell.textContent = '';
+                                            botCell.appendChild(s);
                                         }
                                     } else {
                                         botCell.textContent = 'Unknown';
@@ -963,9 +1045,254 @@
                         });
                     }
 
+                    // ─── Token Balances Section ──────────────────────
+                    fetchTokenBalances(inputAddress, resultDiv);
+
                 } catch (error) {
                     console.error("Error in checkAddress:", error);
                     resultDiv.innerHTML = `<p style='color:red;'>Error: ${error.message || 'Failed to fetch data.'}</p>`;
+                }
+            }
+
+            /********************************************************
+             *  Token Balances (via circles_getTokenBalances RPC)
+             ********************************************************/
+            function classifyToken(t) {
+                if ((t.tokenType || '').startsWith('CrcV1')) return 'v1';
+                if (t.isWrapped) return 'wrapped';
+                if (t.isGroup) return 'group';
+                return 'personal';
+            }
+
+            function typeBadgeEl(t) {
+                const cls = classifyToken(t);
+                const labels = { personal: 'human', group: 'group', wrapped: t.isInflationary ? 'wrapped-infl' : 'wrapped-dem', v1: 'v1' };
+                const cssCls = cls === 'personal' ? 'human' : cls;
+                const span = document.createElement('span');
+                span.className = 'type-badge ' + cssCls;
+                span.textContent = labels[cls] || cls;
+                return span;
+            }
+
+            function fmtBal(n) {
+                if (n == null || isNaN(n)) return '0';
+                return Number(n).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            }
+
+            function mkSummaryCard(label, value) {
+                const card = document.createElement('div');
+                card.className = 'token-summary-card';
+                const lbl = document.createElement('div');
+                lbl.className = 'label';
+                lbl.textContent = label;
+                const val = document.createElement('div');
+                val.className = 'value';
+                val.textContent = value;
+                card.appendChild(lbl);
+                card.appendChild(val);
+                return card;
+            }
+
+            async function fetchTokenBalances(address, container) {
+                const section = document.createElement('div');
+                section.id = 'tokenBalancesSection';
+                const heading = document.createElement('h3');
+                heading.style.cssText = 'margin-top:24px;font-size:1.1rem;';
+                heading.textContent = 'Token Balances ';
+                const trustLink2 = document.createElement('a');
+                trustLink2.href = '#trustSection';
+                trustLink2.style.cssText = 'font-size:0.8rem;color:#191568;margin-left:8px;font-weight:400;';
+                trustLink2.textContent = 'Trust \u2191';
+                heading.appendChild(trustLink2);
+                const topLink = document.createElement('a');
+                topLink.href = '#topSection';
+                topLink.style.cssText = 'font-size:0.8rem;color:#191568;margin-left:8px;font-weight:400;';
+                topLink.textContent = 'Top \u2191';
+                heading.appendChild(topLink);
+                const spinner = document.createElement('span');
+                spinner.className = 'loader';
+                spinner.id = 'tokenLoader';
+                heading.appendChild(spinner);
+                section.appendChild(heading);
+                container.appendChild(section);
+
+                try {
+                    const res = await fetch('https://rpc.aboutcircles.com/', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({jsonrpc:'2.0', id:2, method:'circles_getTokenBalances', params:[address]})
+                    });
+                    const rpcData = await res.json();
+                    const tokens = rpcData.result || [];
+                    const loader = document.getElementById('tokenLoader');
+                    if (loader) loader.remove();
+
+                    if (!tokens.length) {
+                        const p = document.createElement('p');
+                        p.className = 'info';
+                        p.style.color = '#666';
+                        p.textContent = 'No token balances found.';
+                        section.appendChild(p);
+                        return;
+                    }
+
+                    // Summaries
+                    let totalCrc = 0, wrappedCrc = 0, groupCrc = 0, groupCount = 0, v1Crc = 0;
+                    tokens.forEach(t => {
+                        const crc = Number(t.crc) || 0;
+                        totalCrc += crc;
+                        if (t.isWrapped) wrappedCrc += crc;
+                        if (t.isGroup) { groupCrc += crc; groupCount++; }
+                        if ((t.tokenType || '').startsWith('CrcV1')) v1Crc += crc;
+                    });
+
+                    const summaryDiv = document.createElement('div');
+                    summaryDiv.className = 'token-summary';
+                    summaryDiv.appendChild(mkSummaryCard('Total CRC', fmtBal(totalCrc)));
+                    summaryDiv.appendChild(mkSummaryCard('Wrapped ERC20', fmtBal(wrappedCrc)));
+                    summaryDiv.appendChild(mkSummaryCard('Group Tokens', groupCount + ' (' + fmtBal(groupCrc) + ')'));
+                    summaryDiv.appendChild(mkSummaryCard('V1', fmtBal(v1Crc)));
+                    section.appendChild(summaryDiv);
+
+                    // Filter buttons
+                    const filterDiv = document.createElement('div');
+                    filterDiv.className = 'token-filters';
+                    let currentFilter = 'all';
+                    const filterNames = ['all', 'personal', 'group', 'wrapped', 'v1'];
+
+                    function renderFilters() {
+                        filterDiv.textContent = '';
+                        filterNames.forEach(f => {
+                            const btn = document.createElement('button');
+                            btn.className = 'token-filter-btn' + (currentFilter === f ? ' active' : '');
+                            btn.textContent = f.charAt(0).toUpperCase() + f.slice(1);
+                            btn.onclick = () => { currentFilter = f; renderFilters(); renderTokenTable(); };
+                            filterDiv.appendChild(btn);
+                        });
+                    }
+                    renderFilters();
+                    section.appendChild(filterDiv);
+
+                    const tableContainer = document.createElement('div');
+                    tableContainer.id = 'tokenTableContainer';
+                    section.appendChild(tableContainer);
+
+                    let sortCol = 'crc';
+                    let sortAsc = false;
+
+                    function renderTokenTable() {
+                        let filtered = currentFilter === 'all' ? tokens : tokens.filter(t => classifyToken(t) === currentFilter);
+                        filtered.sort((a, b) => {
+                            const va = sortCol === 'crc' ? (Number(a.crc)||0) : (Number(a.staticCircles)||0);
+                            const vb = sortCol === 'crc' ? (Number(b.crc)||0) : (Number(b.staticCircles)||0);
+                            return sortAsc ? va - vb : vb - va;
+                        });
+
+                        tableContainer.textContent = '';
+                        if (!filtered.length) {
+                            const p = document.createElement('p');
+                            p.className = 'info';
+                            p.style.color = '#666';
+                            p.textContent = 'No tokens match this filter.';
+                            tableContainer.appendChild(p);
+                            return;
+                        }
+
+                        const table = document.createElement('table');
+                        const thead = document.createElement('thead');
+                        const headerRow = document.createElement('tr');
+                        const cols = [
+                            {key:'owner', label:'Token Owner', sort:false},
+                            {key:'type', label:'Type', sort:false},
+                            {key:'crc', label:'Balance (CRC)', sort:true},
+                            {key:'static', label:'Balance (static)', sort:true},
+                            {key:'wrapped', label:'Wrapped', sort:false}
+                        ];
+                        cols.forEach(col => {
+                            const th = document.createElement('th');
+                            th.textContent = col.label + (col.sort && sortCol === col.key ? (sortAsc ? ' ▲' : ' ▼') : '');
+                            if (col.sort) {
+                                th.className = 'sortable';
+                                th.onclick = () => {
+                                    if (sortCol === col.key) sortAsc = !sortAsc;
+                                    else { sortCol = col.key; sortAsc = false; }
+                                    renderTokenTable();
+                                };
+                            }
+                            headerRow.appendChild(th);
+                        });
+                        thead.appendChild(headerRow);
+                        table.appendChild(thead);
+
+                        const tbody = document.createElement('tbody');
+                        filtered.forEach(t => {
+                            const row = document.createElement('tr');
+
+                            // Owner
+                            const ownerCell = document.createElement('td');
+                            const ownerLink = document.createElement('a');
+                            ownerLink.href = 'profileChecker.html?address=' + t.tokenOwner;
+                            ownerLink.className = 'address-link';
+                            ownerLink.textContent = truncateAddress(t.tokenOwner);
+                            ownerLink.dataset.addr = t.tokenOwner;
+                            ownerCell.appendChild(ownerLink);
+                            row.appendChild(ownerCell);
+
+                            // Type
+                            const typeCell = document.createElement('td');
+                            typeCell.appendChild(typeBadgeEl(t));
+                            row.appendChild(typeCell);
+
+                            // CRC
+                            const crcCell = document.createElement('td');
+                            crcCell.textContent = fmtBal(t.crc);
+                            crcCell.style.fontWeight = '500';
+                            row.appendChild(crcCell);
+
+                            // Static
+                            const staticCell = document.createElement('td');
+                            staticCell.textContent = fmtBal(t.staticCircles);
+                            row.appendChild(staticCell);
+
+                            // Wrapped
+                            const wrappedCell = document.createElement('td');
+                            wrappedCell.textContent = t.isWrapped ? '✓' : '–';
+                            wrappedCell.style.textAlign = 'center';
+                            row.appendChild(wrappedCell);
+
+                            tbody.appendChild(row);
+                        });
+                        table.appendChild(tbody);
+                        tableContainer.appendChild(table);
+
+                        // Batch-fetch names for token owners
+                        const ownerAddrs = filtered.map(t => t.tokenOwner);
+                        batchGetProfileNames(ownerAddrs).then(nameMap => {
+                            tbody.querySelectorAll('a[data-addr]').forEach(link => {
+                                const addr = link.dataset.addr;
+                                if (addr && nameMap[addr] && nameMap[addr] !== 'No name') {
+                                    link.textContent = nameMap[addr];
+                                    link.title = addr;
+                                }
+                            });
+                        });
+
+                        const countLabel = document.createElement('p');
+                        countLabel.className = 'info';
+                        countLabel.style.color = '#666';
+                        countLabel.textContent = 'Showing ' + filtered.length + ' of ' + tokens.length + ' tokens';
+                        tableContainer.appendChild(countLabel);
+                    }
+                    renderTokenTable();
+                } catch (err) {
+                    console.error('Token balances failed:', err);
+                    const loader = document.getElementById('tokenLoader');
+                    if (loader) loader.remove();
+                    const p = document.createElement('p');
+                    p.className = 'info';
+                    p.style.color = 'red';
+                    p.textContent = 'Failed to load token balances: ' + err.message;
+                    section.appendChild(p);
                 }
             }
 
