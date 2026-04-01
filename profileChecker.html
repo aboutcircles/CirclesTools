@@ -637,8 +637,7 @@
                     // and demurragedERC20 is actually the static/inflationary sCRC token.
                     const mainSCRC = erc20Map[inputAddress.toLowerCase()]?.demurragedERC20; // sCRC (inflationary/static)
                     let summaryHtml = '';
-                    summaryHtml += `<div class="info"><strong>Address:</strong> <span id="main-user-name">Loading...</span> <a href="profileHistory.html?address=${inputAddress}" style="font-size:0.85rem;color:#191568;margin-left:8px;" title="View CID History">CID History &rarr;</a></div>`;
-                    summaryHtml += `<div id="topSection" class="info" style="display:flex;gap:8px;margin-top:6px;"><a href="#trustSection" style="font-size:0.85rem;color:#191568;">Trust Connections &darr;</a><a href="#tokenBalancesSection" style="font-size:0.85rem;color:#191568;">Token Balances &darr;</a></div>`;
+                    summaryHtml += `<div id="topSection" class="info" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><strong>Address:</strong> <span id="main-user-name">Loading...</span><span style="margin-left:auto;display:flex;gap:8px;font-size:0.85rem;"><a href="profileHistory.html?address=${inputAddress}" style="color:#191568;">CID History &rarr;</a><a href="#trustSection" style="color:#191568;">Trust &darr;</a><a href="#tokenBalancesSection" style="color:#191568;">Balances &darr;</a></span></div>`;
                     summaryHtml += `<div class="info"><strong>Price:</strong> $<span id="main-user-price">...</span> / CRC</div>`;
                     // V1 Info
                     summaryHtml += `<div class="info"><strong>[V1] Status:</strong> ${v1Data.isHuman ? 'human' : (v1Data.isOrg ? 'org' : 'none')}</div>`;
@@ -1092,10 +1091,15 @@
                 const heading = document.createElement('h3');
                 heading.style.cssText = 'margin-top:24px;font-size:1.1rem;';
                 heading.textContent = 'Token Balances ';
+                const trustLink2 = document.createElement('a');
+                trustLink2.href = '#trustSection';
+                trustLink2.style.cssText = 'font-size:0.8rem;color:#191568;margin-left:8px;font-weight:400;';
+                trustLink2.textContent = 'Trust \u2191';
+                heading.appendChild(trustLink2);
                 const topLink = document.createElement('a');
                 topLink.href = '#topSection';
                 topLink.style.cssText = 'font-size:0.8rem;color:#191568;margin-left:8px;font-weight:400;';
-                topLink.textContent = '\u2191 Top';
+                topLink.textContent = 'Top \u2191';
                 heading.appendChild(topLink);
                 const spinner = document.createElement('span');
                 spinner.className = 'loader';
