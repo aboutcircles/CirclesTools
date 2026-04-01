@@ -638,6 +638,7 @@
                     const mainSCRC = erc20Map[inputAddress.toLowerCase()]?.demurragedERC20; // sCRC (inflationary/static)
                     let summaryHtml = '';
                     summaryHtml += `<div class="info"><strong>Address:</strong> <span id="main-user-name">Loading...</span> <a href="profileHistory.html?address=${inputAddress}" style="font-size:0.85rem;color:#191568;margin-left:8px;" title="View CID History">CID History &rarr;</a></div>`;
+                    summaryHtml += `<div class="info" style="display:flex;gap:8px;margin-top:6px;"><a href="#trustSection" style="font-size:0.85rem;color:#191568;">Trust Connections &darr;</a><a href="#tokenBalancesSection" style="font-size:0.85rem;color:#191568;">Token Balances &darr;</a></div>`;
                     summaryHtml += `<div class="info"><strong>Price:</strong> $<span id="main-user-price">...</span> / CRC</div>`;
                     // V1 Info
                     summaryHtml += `<div class="info"><strong>[V1] Status:</strong> ${v1Data.isHuman ? 'human' : (v1Data.isOrg ? 'org' : 'none')}</div>`;
@@ -755,6 +756,9 @@
                     // For large lists (>100), skip per-row async calls (price, bot, balancer)
                     const isLargeList = trustedAddressesData.length > 100;
                     if (trustedAddressesData.length > 0) {
+                        const trustAnchor = document.createElement("div");
+                        trustAnchor.id = "trustSection";
+                        resultDiv.appendChild(trustAnchor);
                         const table = document.createElement("table");
                         const thead = document.createElement("thead");
                         const headerRow = document.createElement("tr");
@@ -1069,6 +1073,7 @@
 
             async function fetchTokenBalances(address, container) {
                 const section = document.createElement('div');
+                section.id = 'tokenBalancesSection';
                 const heading = document.createElement('h3');
                 heading.style.cssText = 'margin-top:24px;font-size:1.1rem;';
                 heading.textContent = 'Token Balances ';
