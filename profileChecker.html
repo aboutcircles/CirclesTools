@@ -970,9 +970,17 @@
                                 getBotClassification(trustedAddr).then(botData => {
                                     if (botData) {
                                         if (botData.is_bot) {
-                                            botCell.innerHTML = `<span style="color: #cc0000;">Bot (${botData.category})</span>`;
+                                            const s = document.createElement('span');
+                                            s.style.color = '#cc0000';
+                                            s.textContent = 'Bot (' + (botData.category || 'unknown') + ')';
+                                            botCell.textContent = '';
+                                            botCell.appendChild(s);
                                         } else {
-                                            botCell.innerHTML = `<span style="color: #006600;">Human</span>`;
+                                            const s = document.createElement('span');
+                                            s.style.color = '#006600';
+                                            s.textContent = 'Human';
+                                            botCell.textContent = '';
+                                            botCell.appendChild(s);
                                         }
                                     } else {
                                         botCell.textContent = 'Unknown';
@@ -1226,14 +1234,9 @@
                             ownerLink.href = 'profileChecker.html?address=' + t.tokenOwner;
                             ownerLink.className = 'address-link';
                             ownerLink.textContent = truncateAddress(t.tokenOwner);
+                            ownerLink.dataset.addr = t.tokenOwner;
                             ownerCell.appendChild(ownerLink);
                             row.appendChild(ownerCell);
-                            getProfileName(t.tokenOwner).then(name => {
-                                if (name && name !== 'No name' && name !== 'None' && name !== 'Fetch error') {
-                                    ownerLink.textContent = name;
-                                    ownerLink.title = t.tokenOwner;
-                                }
-                            });
 
                             // Type
                             const typeCell = document.createElement('td');
@@ -1261,6 +1264,18 @@
                         });
                         table.appendChild(tbody);
                         tableContainer.appendChild(table);
+
+                        // Batch-fetch names for token owners
+                        const ownerAddrs = filtered.map(t => t.tokenOwner);
+                        batchGetProfileNames(ownerAddrs).then(nameMap => {
+                            tbody.querySelectorAll('a[data-addr]').forEach(link => {
+                                const addr = link.dataset.addr;
+                                if (addr && nameMap[addr] && nameMap[addr] !== 'No name') {
+                                    link.textContent = nameMap[addr];
+                                    link.title = addr;
+                                }
+                            });
+                        });
 
                         const countLabel = document.createElement('p');
                         countLabel.className = 'info';

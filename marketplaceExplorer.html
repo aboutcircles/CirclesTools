@@ -905,10 +905,15 @@
     // Seller info cache: { address: { name, type, hasCidHistory } }
     var sellerInfoCache = {};
 
-    async function enrichSeller(address) {
+    // Cache stores promises to deduplicate in-flight requests
+    function enrichSeller(address) {
         var key = address.toLowerCase();
         if (sellerInfoCache[key]) return sellerInfoCache[key];
+        sellerInfoCache[key] = _enrichSellerImpl(key);
+        return sellerInfoCache[key];
+    }
 
+    async function _enrichSellerImpl(key) {
         var info = { name: null, type: null };
 
         // Profile name + CID from pinning service
@@ -970,7 +975,6 @@
         } catch (e) {}
 
 
-        sellerInfoCache[key] = info;
         return info;
     }
 
@@ -1025,7 +1029,7 @@
     function formatCrc(amountWei) {
         if (!amountWei) return '0';
         var s = String(amountWei);
-        if (s.length <= 18) return '0.' + '0'.repeat(18 - s.length) + s.replace(/0+$/, '') || '0';
+        if (s.length <= 18) { var f = s.replace(/0+$/, ''); return f ? '0.' + '0'.repeat(18 - s.length) + f : '0'; }
         var whole = s.slice(0, s.length - 18);
         var frac = s.slice(s.length - 18).replace(/0+$/, '');
         return frac ? whole + '.' + frac : whole;
@@ -1071,6 +1075,7 @@
         paymentFilterSeller = addr;
         paymentFilterGateway = null;
         paymentsLoaded = false;
+        paymentsPage = 0;
         switchTab('payments');
         loadPayments();
     }
@@ -1079,6 +1084,7 @@
         paymentFilterSeller = null;
         paymentFilterGateway = null;
         paymentsLoaded = false;
+        paymentsPage = 0;
         loadPayments();
         syncUrlState();
     }

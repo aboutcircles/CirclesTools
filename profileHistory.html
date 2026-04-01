@@ -1065,13 +1065,11 @@
         for (var i = 0; i < str.length; i++) {
             var c = B58_ALPHABET.indexOf(str[i]);
             if (c < 0) throw new Error('Invalid base58 char: ' + str[i]);
-            for (var j = 0; j < bytes.length; j++) bytes[j] *= 58;
-            bytes[0] += c;
-            var carry = 0;
+            var carry = c;
             for (var j = 0; j < bytes.length; j++) {
-                bytes[j] += carry;
-                carry = (bytes[j] >> 8);
-                bytes[j] &= 0xff;
+                carry += bytes[j] * 58;
+                bytes[j] = carry & 0xff;
+                carry >>= 8;
             }
             while (carry) { bytes.push(carry & 0xff); carry >>= 8; }
         }
