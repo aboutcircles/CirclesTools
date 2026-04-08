@@ -1137,21 +1137,23 @@
                     }
 
                     // Summaries
-                    let totalCrc = 0, wrappedCrc = 0, groupCrc = 0, groupCount = 0, v1Crc = 0;
+                    let totalCircles = 0, wrappedCircles = 0, unwrappedCircles = 0, groupCircles = 0, groupCount = 0, v1Circles = 0;
                     tokens.forEach(t => {
-                        const crc = Number(t.crc) || 0;
-                        totalCrc += crc;
-                        if (t.isWrapped) wrappedCrc += crc;
-                        if (t.isGroup) { groupCrc += crc; groupCount++; }
-                        if ((t.tokenType || '').startsWith('CrcV1')) v1Crc += crc;
+                        const bal = Number(t.circles) || 0;
+                        totalCircles += bal;
+                        if (t.isWrapped) wrappedCircles += bal;
+                        else if (!(t.tokenType || '').startsWith('CrcV1')) unwrappedCircles += bal;
+                        if (t.isGroup) { groupCircles += bal; groupCount++; }
+                        if ((t.tokenType || '').startsWith('CrcV1')) v1Circles += bal;
                     });
 
                     const summaryDiv = document.createElement('div');
                     summaryDiv.className = 'token-summary';
-                    summaryDiv.appendChild(mkSummaryCard('Total CRC', fmtBal(totalCrc)));
-                    summaryDiv.appendChild(mkSummaryCard('Wrapped ERC20', fmtBal(wrappedCrc)));
-                    summaryDiv.appendChild(mkSummaryCard('Group Tokens', groupCount + ' (' + fmtBal(groupCrc) + ')'));
-                    summaryDiv.appendChild(mkSummaryCard('V1', fmtBal(v1Crc)));
+                    summaryDiv.appendChild(mkSummaryCard('Total Circles', fmtBal(totalCircles)));
+                    summaryDiv.appendChild(mkSummaryCard('Unwrapped', fmtBal(unwrappedCircles)));
+                    summaryDiv.appendChild(mkSummaryCard('Wrapped ERC20', fmtBal(wrappedCircles)));
+                    summaryDiv.appendChild(mkSummaryCard('Group Tokens', groupCount + ' (' + fmtBal(groupCircles) + ')'));
+                    summaryDiv.appendChild(mkSummaryCard('V1', fmtBal(v1Circles)));
                     section.appendChild(summaryDiv);
 
                     // Filter buttons
@@ -1177,14 +1179,14 @@
                     tableContainer.id = 'tokenTableContainer';
                     section.appendChild(tableContainer);
 
-                    let sortCol = 'crc';
+                    let sortCol = 'circles';
                     let sortAsc = false;
 
                     function renderTokenTable() {
                         let filtered = currentFilter === 'all' ? tokens : tokens.filter(t => classifyToken(t) === currentFilter);
                         filtered.sort((a, b) => {
-                            const va = sortCol === 'crc' ? (Number(a.crc)||0) : (Number(a.staticCircles)||0);
-                            const vb = sortCol === 'crc' ? (Number(b.crc)||0) : (Number(b.staticCircles)||0);
+                            const va = sortCol === 'circles' ? (Number(a.circles)||0) : (Number(a.staticCircles)||0);
+                            const vb = sortCol === 'circles' ? (Number(b.circles)||0) : (Number(b.staticCircles)||0);
                             return sortAsc ? va - vb : vb - va;
                         });
 
@@ -1204,7 +1206,7 @@
                         const cols = [
                             {key:'owner', label:'Token Owner', sort:false},
                             {key:'type', label:'Type', sort:false},
-                            {key:'crc', label:'Balance (CRC)', sort:true},
+                            {key:'circles', label:'Balance (Circles)', sort:true},
                             {key:'static', label:'Balance (static)', sort:true},
                             {key:'wrapped', label:'Wrapped', sort:false}
                         ];
@@ -1243,9 +1245,9 @@
                             typeCell.appendChild(typeBadgeEl(t));
                             row.appendChild(typeCell);
 
-                            // CRC
+                            // Circles
                             const crcCell = document.createElement('td');
-                            crcCell.textContent = fmtBal(t.crc);
+                            crcCell.textContent = fmtBal(t.circles);
                             crcCell.style.fontWeight = '500';
                             row.appendChild(crcCell);
 
