@@ -725,6 +725,19 @@
         .json-display .null { color: #569cd6; }
         .json-display .key { color: #9cdcfe; }
         .json-display .bracket { color: #ffd700; }
+        .hex-decode-badge {
+            display: inline;
+            cursor: pointer;
+            margin-left: 4px;
+            color: #569cd6;
+            opacity: 0.6;
+            font-size: 0.85em;
+        }
+        .hex-decode-badge:hover { opacity: 1; }
+        .hex-decoded {
+            color: #4ec9b0;
+            font-style: italic;
+        }
 
         .curl-display {
             font-family: 'SF Mono', Monaco, monospace;
@@ -2089,6 +2102,37 @@
                 }
                 selectMethod(paramMethod, sidebarItem);
                 sidebarItem.scrollIntoView({ block: 'center', behavior: 'smooth' });
+
+                // Pre-fill form fields from URL params (e.g. &address=0x...&direction=sent)
+                var config = METHODS[paramMethod];
+                if (config.params) {
+                    config.params.forEach(function(param) {
+                        var val = urlParams.get(param.name);
+                        if (val !== null) {
+                            var el = document.getElementById('param-' + param.name);
+                            if (el) {
+                                if (param.type === 'boolean') {
+                                    el.checked = val === 'true' || val === '1';
+                                } else {
+                                    el.value = val;
+                                }
+                                // Expand optional section if an optional param is pre-filled
+                                if (!param.required) {
+                                    var optContent = el.closest('.optional-content');
+                                    if (optContent && !optContent.classList.contains('visible')) {
+                                        var toggle = optContent.previousElementSibling;
+                                        if (toggle) toggleOptional(toggle);
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // Auto-execute if &run=1 is set
+                if (urlParams.get('run') === '1') {
+                    setTimeout(function() { executeRequest(); }, 300);
+                }
             }
         }
     });
@@ -3111,6 +3155,22 @@
                     return '<span class="' + cls + '">' + match;
                 } else {
                     cls = 'string';
+                    // Detect hex data (0x... or \\x... from PostgreSQL bytea) and offer UTF-8 decode
+                    var innerVal = match.slice(1, -1);
+                    var hexBody = null;
+                    if (/^0x[0-9a-fA-F]{4,}$/.test(innerVal)) {
+                        hexBody = innerVal.slice(2);
+                    } else if (/^\\\\x[0-9a-fA-F]{4,}$/.test(innerVal)) {
+                        hexBody = innerVal.slice(3);
+                    }
+                    if (hexBody) {
+                        var decoded = tryDecodeHexUtf8(hexBody);
+                        if (decoded) {
+                            return '<span class="' + cls + '">' + match + '</span>' +
+                                '<span class="hex-decode-badge" onclick="toggleHexDecode(this)" title="Decode hex as UTF-8"><i class="fas fa-language"></i></span>' +
+                                '<span class="hex-decoded" style="display:none;"> \u2192 "' + escapeHtml(decoded) + '"</span>';
+                        }
+                    }
                 }
             } else if (/true|false/.test(match)) {
                 cls = 'boolean';
@@ -3194,6 +3254,58 @@
         var div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    // Decode CrcV2 transfer data: [version:1B][type:2B][length:2B][payload]
+    // Types: 0x0001=UTF-8 text, 0x0002=32B hex ID, 0x0003=IPFS CID, 0x1001=text+metadata, 0x0004=ABI calldata
+    function tryDecodeHexUtf8(hexBody) {
+        if (hexBody.length < 4 || hexBody.length % 2 !== 0) return null;
+        try {
+            var bytes = new Uint8Array(hexBody.length / 2);
+            for (var i = 0; i < hexBody.length; i += 2) {
+                bytes[i / 2] = parseInt(hexBody.substr(i, 2), 16);
+            }
+            // Try structured CrcV2 format: version=0x01, type, length, payload
+            if (bytes.length >= 5 && bytes[0] === 0x01) {
+                var type = (bytes[1] << 8) | bytes[2];
+                var len = (bytes[3] << 8) | bytes[4];
+                if (len > 0 && bytes.length === 5 + len) {
+                    var payload = bytes.slice(5, 5 + len);
+                    if (type === 0x0001) {
+                        return new TextDecoder('utf-8', { fatal: true }).decode(payload);
+                    }
+                    if (type === 0x1001) {
+                        // Text + metadata separated by 0x480a868a
+                        var sep = [0x48, 0x0a, 0x86, 0x8a];
+                        for (var s = 0; s <= payload.length - 4; s++) {
+                            if (payload[s] === sep[0] && payload[s+1] === sep[1] && payload[s+2] === sep[2] && payload[s+3] === sep[3]) {
+                                var msg = new TextDecoder('utf-8', { fatal: true }).decode(payload.slice(0, s));
+                                var meta = new TextDecoder('utf-8', { fatal: true }).decode(payload.slice(s + 4));
+                                return msg + (meta ? ' [meta: ' + meta + ']' : '');
+                            }
+                        }
+                    }
+                    if (type === 0x0002) return '[XMTP ID] 0x' + Array.from(payload).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+                    if (type === 0x0003) return '[IPFS CID] (' + len + ' bytes)';
+                    if (type === 0x0004) return '[ABI calldata] 0x' + Array.from(payload.slice(0, 4)).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('') + '...';
+                }
+            }
+            // Fallback: raw UTF-8 decode with printable check
+            var text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+            text = text.replace(/^[\x00-\x1f]+/, '').replace(/[\x00-\x1f]+$/, '');
+            if (text.length === 0) return null;
+            var printable = 0;
+            for (var j = 0; j < text.length; j++) {
+                var code = text.charCodeAt(j);
+                if ((code >= 32 && code <= 126) || code === 10 || code === 13 || code === 9 || code > 127) printable++;
+            }
+            return (printable / text.length >= 0.8) ? text : null;
+        } catch (e) { return null; }
+    }
+
+    function toggleHexDecode(el) {
+        var decoded = el.nextElementSibling;
+        decoded.style.display = decoded.style.display === 'none' ? 'inline' : 'none';
     }
 
     // Deep object diff - returns object with only different paths
