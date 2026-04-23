@@ -712,9 +712,23 @@
                     });
                 })(sellerLine, sellerLink, sellerAddr);
             }
-            // Inventory badge — disabled: /inventory endpoint returns 404 for all products.
-            // TODO: re-enable when market-api inventory tracking is implemented.
-            // if (sku && sellerAddr) { ... }
+            // Inventory badge — construct URL from seller + SKU
+            if (sku && sellerAddr) {
+                var invBadge = el('div', {style: 'font-size:0.8rem;'});
+                metaBottom.appendChild(invBadge);
+                (function(b, s, k) {
+                    var invUrl = apiBase + '/inventory/inventory/100/' + s + '/' + encodeURIComponent(k);
+                    fetch(invUrl).then(function(r) { return r.ok ? r.json() : null; }).then(function(data) {
+                        if (!data) return;
+                        var qty = data.value != null ? data.value : (data.quantity != null ? data.quantity : null);
+                        if (typeof qty === 'number') {
+                            var color = qty > 0 ? 'background:#dcfce7;color:#166534;' : 'background:#fee2e2;color:#991b1b;';
+                            b.appendChild(el('span', {style: 'font-size:0.7rem;padding:1px 6px;border-radius:8px;' + color},
+                                qty > 0 ? qty + ' in stock' : 'Out of stock'));
+                        }
+                    }).catch(function() {});
+                })(invBadge, sellerAddr, sku);
+            }
             card.appendChild(metaBottom);
 
             grid.appendChild(card);
