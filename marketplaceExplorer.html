@@ -269,6 +269,26 @@
             color: var(--text-muted); font-size: 0.85rem; padding: 2px;
         }
         .copy-btn:hover { color: var(--primary); }
+
+        /* Click-to-show tooltip (replaces native title for touch support) */
+        .tip-wrap { cursor: help; }
+        .tip-bubble {
+            display: none;
+            position: fixed;
+            background: var(--text);
+            color: #fff;
+            font-size: 0.75rem;
+            line-height: 1.4;
+            padding: 8px 10px;
+            border-radius: 6px;
+            white-space: pre-line;
+            min-width: 220px;
+            max-width: 320px;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        .tip-wrap.tip-open .tip-bubble { display: block; }
+
         .tab-filter {
             display: flex;
             align-items: center;
@@ -442,6 +462,48 @@
         }
         return e;
     }
+
+    // Click-to-show tooltip: wraps content in a .tip-wrap with a fixed .tip-bubble
+    function positionBubble(wrap, bubble) {
+        var rect = wrap.getBoundingClientRect();
+        var bh = bubble.offsetHeight || 0;
+        var bw = bubble.offsetWidth || 280;
+        // prefer below, fall back above if near viewport bottom
+        var top = rect.bottom + 6;
+        if (top + bh > window.innerHeight) top = rect.top - bh - 6;
+        var left = rect.left + rect.width / 2 - bw / 2;
+        if (left < 8) left = 8;
+        if (left + bw > window.innerWidth - 8) left = window.innerWidth - bw - 8;
+        bubble.style.top = top + 'px';
+        bubble.style.left = left + 'px';
+    }
+    function toggleTip(wrap, bubble) {
+        var wasOpen = wrap.classList.contains('tip-open');
+        document.querySelectorAll('.tip-open').forEach(function(o) { o.classList.remove('tip-open'); });
+        if (wasOpen) return;  // was open → just closed, done
+        // open: show first so offsetHeight is measurable, then position
+        wrap.classList.add('tip-open');
+        positionBubble(wrap, bubble);
+    }
+    function tipWrap(content, tipText) {
+        var wrap = el('span', {className: 'tip-wrap'});
+        if (typeof content === 'string') wrap.textContent = content;
+        else wrap.appendChild(content);
+        var bubble = el('div', {className: 'tip-bubble'}, tipText);
+        wrap.appendChild(bubble);
+        wrap.addEventListener('click', function(e) {
+            e.stopPropagation();
+            toggleTip(wrap, bubble);
+        });
+        return wrap;
+    }
+    // Close tooltips when clicking outside or scrolling
+    document.addEventListener('click', function() {
+        document.querySelectorAll('.tip-open').forEach(function(o) { o.classList.remove('tip-open'); });
+    });
+    window.addEventListener('scroll', function() {
+        document.querySelectorAll('.tip-open').forEach(function(o) { o.classList.remove('tip-open'); });
+    }, true);
 
     function truncAddr(a) {
         if (!a) return '';
@@ -717,7 +779,7 @@
                 var invBadge = el('div', {style: 'font-size:0.8rem;'});
                 metaBottom.appendChild(invBadge);
                 (function(b, s, k) {
-                    var invUrl = apiBase + '/inventory/100/' + s + '/' + encodeURIComponent(k);
+                    var invUrl = apiBase + '/inventory/inventory/100/' + s + '/' + encodeURIComponent(k);
                     fetch(invUrl).then(function(r) { return r.ok ? r.json() : null; }).then(function(data) {
                         if (!data) return;
                         var qty = data.value != null ? data.value : (data.quantity != null ? data.quantity : null);
@@ -997,7 +1059,7 @@
     }
 
     // ─── Pricing API (CRC → EUR conversion via metrics-exporter) ────
-    // Pricing API runs on staging nodes only (metrics-exporter, not on prod)
+    // Endpoint may not be available on all nodes (deploy_metrics_exporter flag)
     var PRICING_API = 'https://rpc.staging.aboutcircles.com/metrics-api/pricing';
     var priceCache = {};
     var priceInflight = {};  // dedup concurrent requests for same date
@@ -1171,33 +1233,55 @@
         // EUR Volume card (async, filled when price data arrives)
         var eurCard = el('div', {style: 'background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:12px 16px;min-width:120px;'});
         eurCard.appendChild(el('div', {style: 'font-size:0.8rem;color:var(--text-muted);'}, 'EUR Volume'));
-        var eurValue = el('div', {style: 'font-size:1.3rem;font-weight:700;'}, '…');
+        var eurValue = el('div', {style: 'font-size:1.3rem;font-weight:700;'}, '\u2026');
         eurCard.appendChild(eurValue);
+        var eurSource = el('div', {style: 'font-size:0.65rem;color:var(--text-muted);margin-top:2px;'});
+        eurCard.appendChild(eurSource);
         stats.appendChild(eurCard);
         container.appendChild(stats);
 
-        // Compute EUR volume async (batch unique dates to minimize API calls)
-        (async function() {
-            var dateBuckets = {};  // { "2026-04-20": { crc: 123.4, ts: 1713571200 } }
-            allPayments.forEach(function(r) {
-                var dateStr = new Date(r[5] * 1000).toISOString().split('T')[0];
-                if (!dateBuckets[dateStr]) dateBuckets[dateStr] = { crc: 0, ts: r[5] };
-                dateBuckets[dateStr].crc += parseFloat(formatCrc(r[3]));
-            });
-            var totalEur = 0;
-            var hasEur = false;
-            for (var dateStr in dateBuckets) {
-                var bucket = dateBuckets[dateStr];
-                var price = await getCrcPrice(bucket.ts);
-                if (price && price.dcrc_eur > 0) {
-                    totalEur += bucket.crc * price.dcrc_eur;
-                    hasEur = true;
-                } else if (price && price.dcrc_xdai > 0) {
-                    totalEur += bucket.crc * price.dcrc_xdai;
-                    hasEur = true;
+        // Compute EUR volume async (batch unique dates to minimize API calls).
+        // Stored as volumeDone so per-row lookups can chain on it (avoids rate-limit race).
+        var volumeDone = (async function() {
+            try {
+                var dateBuckets = {};  // { "2026-04-20": { crc: 123.4, ts: 1713571200 } }
+                allPayments.forEach(function(r) {
+                    var ts = Number(r[5]);
+                    if (!isFinite(ts) || ts <= 0) return;  // skip bad timestamps
+                    var dateStr = new Date(ts * 1000).toISOString().split('T')[0];
+                    if (!dateBuckets[dateStr]) dateBuckets[dateStr] = { crc: 0, ts: ts };
+                    dateBuckets[dateStr].crc += parseFloat(formatCrc(r[3]));
+                });
+                var totalEur = 0;
+                var hasEur = false;
+                var hasXdaiFallback = false;
+                for (var dateStr in dateBuckets) {
+                    var bucket = dateBuckets[dateStr];
+                    var price = await getCrcPrice(bucket.ts);
+                    if (price && price.dcrc_eur > 0) {
+                        totalEur += bucket.crc * price.dcrc_eur;
+                        hasEur = true;
+                    } else if (price && price.dcrc_xdai > 0) {
+                        totalEur += bucket.crc * price.dcrc_xdai;
+                        hasEur = true;
+                        hasXdaiFallback = true;
+                    }
+                }
+                if (!eurValue.isConnected) return;
+                if (hasEur) {
+                    eurValue.textContent = (hasXdaiFallback ? '~' : '') + '\u20AC' + totalEur.toFixed(2);
+                    eurSource.textContent = 'Balancer V3 + CoinGecko, daily rate' + (hasXdaiFallback ? ' (partial xDAI fallback)' : '');
+                } else {
+                    eurValue.textContent = '\u2014';
+                    eurSource.textContent = 'Rate data unavailable';
+                }
+            } catch (err) {
+                console.warn('EUR volume computation failed', err);
+                if (eurValue.isConnected) {
+                    eurValue.textContent = '\u2014';
+                    eurSource.textContent = 'Computation error';
                 }
             }
-            if (eurValue.isConnected) eurValue.textContent = hasEur ? '€' + totalEur.toFixed(2) : '—';
         })();
 
         // Filter banner
@@ -1288,7 +1372,18 @@
         var table = el('table');
         var thead = el('thead');
         var hr = el('tr');
-        ['Time', 'Payer', 'Payee', 'Amount', 'EUR Value', 'Reference', 'Tx'].forEach(function(h) { hr.appendChild(el('th', {}, h)); });
+        ['Time', 'Payer', 'Payee', 'Amount', 'EUR Value', 'Reference', 'Tx'].forEach(function(h) {
+            var th = el('th', {}, h);
+            if (h === 'EUR Value') {
+                var infoIcon = el('span', {style: 'margin-left:4px;font-weight:400;opacity:0.6;'}, '\u24D8');
+                th.appendChild(tipWrap(infoIcon,
+                    'CRC/EUR rate: Balancer V3 pool price (live for today, historic for past dates) + CoinGecko DAI/EUR.\n'
+                    + 'Granularity: one rate per calendar day (UTC).\n'
+                    + 'Click each row\u2019s EUR value for exact rate, date, and source.\n'
+                    + 'If EUR unavailable, xDAI equivalent shown instead.'));
+            }
+            hr.appendChild(th);
+        });
         thead.appendChild(hr);
         table.appendChild(thead);
 
@@ -1331,24 +1426,53 @@
             // Amount
             row.appendChild(el('td', {style: 'font-weight:600;color:var(--accent);white-space:nowrap;'}, formatCrc(r[3]) + ' CRC'));
 
-            // EUR Value (async, filled when price data arrives)
-            var eurCell = el('td', {style: 'white-space:nowrap;font-size:0.85rem;color:var(--text-muted);'}, '—');
+            // EUR Value — waits for volumeDone so all dates are cached (avoids rate-limit race)
+            var eurCell = el('td', {className: 'tip-wrap', style: 'white-space:nowrap;font-size:0.85rem;color:var(--text-muted);'});
+            var eurLabel = el('span', {}, '\u2026');
+            var eurBubble = el('div', {className: 'tip-bubble'});
+            eurCell.appendChild(eurLabel);
+            eurCell.appendChild(eurBubble);
+            eurCell.addEventListener('click', function(e) {
+                if (!eurBubble.textContent) return;
+                e.stopPropagation();
+                toggleTip(eurCell, eurBubble);
+            });
             row.appendChild(eurCell);
-            (function(cell, amount, timestamp) {
-                getCrcPrice(timestamp).then(function(price) {
+            (function(label, bubble, cell, amount, timestamp) {
+                var txDate = new Date(timestamp * 1000).toISOString().split('T')[0];
+                volumeDone.then(function() {
+                    return getCrcPrice(timestamp);
+                }).then(function(price) {
+                    var crc = parseFloat(formatCrc(amount));
+                    var rateDate = (price && price.date) ? price.date : txDate;
+                    var source = price ? (price.source || 'unknown') : '';
+                    var sourceLabel = source === 'balancer_live' ? 'Balancer V3 live'
+                        : source === 'balancer_historic' ? 'Balancer V3 historic' : source;
                     if (price && price.dcrc_eur > 0) {
-                        var crc = parseFloat(formatCrc(amount));
                         var eur = (crc * price.dcrc_eur).toFixed(2);
-                        cell.textContent = '€' + eur;
+                        label.textContent = '\u20AC' + eur;
                         cell.style.color = 'var(--text)';
+                        bubble.textContent = '1 CRC = \u20AC' + price.dcrc_eur.toFixed(6) + '\n'
+                            + 'Rate date: ' + rateDate + '\n'
+                            + 'Source: ' + sourceLabel + ' + CoinGecko DAI/EUR';
                     } else if (price && price.dcrc_xdai > 0) {
-                        var crc = parseFloat(formatCrc(amount));
                         var xdai = (crc * price.dcrc_xdai).toFixed(4);
-                        cell.textContent = '$' + xdai;
-                        cell.title = 'xDAI (EUR rate unavailable)';
+                        label.textContent = '~$' + xdai + ' xDAI';
+                        label.style.fontSize = '0.8rem';
+                        bubble.textContent = 'CoinGecko DAI/EUR unavailable \u2014 showing xDAI equivalent\n'
+                            + '1 CRC = $' + price.dcrc_xdai.toFixed(6) + ' xDAI\n'
+                            + 'Rate date: ' + rateDate + '\n'
+                            + 'Source: ' + sourceLabel;
+                    } else {
+                        label.textContent = '\u2014';
+                        bubble.textContent = 'Price data unavailable for ' + txDate;
                     }
+                }).catch(function(err) {
+                    console.warn('EUR conversion failed for ' + txDate, err);
+                    label.textContent = '\u2014';
+                    bubble.textContent = 'Price conversion error';
                 });
-            })(eurCell, r[3], r[5]);
+            })(eurLabel, eurBubble, eurCell, r[3], r[5]);
 
             // Reference (decoded from hex)
             var ref = hexToUtf8(r[4]);
