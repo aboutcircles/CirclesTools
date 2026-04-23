@@ -1171,8 +1171,10 @@
         // EUR Volume card (async, filled when price data arrives)
         var eurCard = el('div', {style: 'background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:12px 16px;min-width:120px;'});
         eurCard.appendChild(el('div', {style: 'font-size:0.8rem;color:var(--text-muted);'}, 'EUR Volume'));
-        var eurValue = el('div', {style: 'font-size:1.3rem;font-weight:700;'}, '…');
+        var eurValue = el('div', {style: 'font-size:1.3rem;font-weight:700;'}, '\u2026');
         eurCard.appendChild(eurValue);
+        var eurSource = el('div', {style: 'font-size:0.65rem;color:var(--text-muted);margin-top:2px;'});
+        eurCard.appendChild(eurSource);
         stats.appendChild(eurCard);
         container.appendChild(stats);
 
@@ -1186,6 +1188,7 @@
             });
             var totalEur = 0;
             var hasEur = false;
+            var hasXdaiFallback = false;
             for (var dateStr in dateBuckets) {
                 var bucket = dateBuckets[dateStr];
                 var price = await getCrcPrice(bucket.ts);
@@ -1195,9 +1198,17 @@
                 } else if (price && price.dcrc_xdai > 0) {
                     totalEur += bucket.crc * price.dcrc_xdai;
                     hasEur = true;
+                    hasXdaiFallback = true;
                 }
             }
-            if (eurValue.isConnected) eurValue.textContent = hasEur ? '€' + totalEur.toFixed(2) : '—';
+            if (!eurValue.isConnected) return;
+            if (hasEur) {
+                eurValue.textContent = (hasXdaiFallback ? '~' : '') + '\u20AC' + totalEur.toFixed(2);
+                eurSource.textContent = 'Balancer + CoinGecko, daily rate' + (hasXdaiFallback ? ' (partial xDAI fallback)' : '');
+            } else {
+                eurValue.textContent = '\u2014';
+                eurSource.textContent = 'Rate data unavailable';
+            }
         })();
 
         // Filter banner
@@ -1288,7 +1299,17 @@
         var table = el('table');
         var thead = el('thead');
         var hr = el('tr');
-        ['Time', 'Payer', 'Payee', 'Amount', 'EUR Value', 'Reference', 'Tx'].forEach(function(h) { hr.appendChild(el('th', {}, h)); });
+        ['Time', 'Payer', 'Payee', 'Amount', 'EUR Value', 'Reference', 'Tx'].forEach(function(h) {
+            var th = el('th', {}, h);
+            if (h === 'EUR Value') {
+                var info = el('span', {
+                    style: 'cursor:help;margin-left:4px;font-weight:400;opacity:0.6;',
+                    title: 'Daily CRC/EUR rate from Balancer V3 pool price + CoinGecko DAI/EUR.\nGranularity: one rate per calendar day (UTC).\nIf EUR unavailable, xDAI equivalent shown instead.'
+                }, '\u24D8');
+                th.appendChild(info);
+            }
+            hr.appendChild(th);
+        });
         thead.appendChild(hr);
         table.appendChild(thead);
 
@@ -1332,20 +1353,34 @@
             row.appendChild(el('td', {style: 'font-weight:600;color:var(--accent);white-space:nowrap;'}, formatCrc(r[3]) + ' CRC'));
 
             // EUR Value (async, filled when price data arrives)
-            var eurCell = el('td', {style: 'white-space:nowrap;font-size:0.85rem;color:var(--text-muted);'}, '—');
+            var eurCell = el('td', {style: 'white-space:nowrap;font-size:0.85rem;color:var(--text-muted);'}, '…');
             row.appendChild(eurCell);
             (function(cell, amount, timestamp) {
                 getCrcPrice(timestamp).then(function(price) {
+                    var crc = parseFloat(formatCrc(amount));
+                    var rateDate = price ? (price.date || new Date(timestamp * 1000).toISOString().split('T')[0]) : '';
+                    var source = price ? (price.source || 'unknown') : '';
+                    var sourceLabel = source === 'balancer_live' ? 'Balancer V3 live'
+                        : source === 'balancer_historic' ? 'Balancer V3 historic'
+                        : source === 'cached' ? 'cached' : source;
                     if (price && price.dcrc_eur > 0) {
-                        var crc = parseFloat(formatCrc(amount));
                         var eur = (crc * price.dcrc_eur).toFixed(2);
-                        cell.textContent = '€' + eur;
+                        cell.textContent = '\u20AC' + eur;
                         cell.style.color = 'var(--text)';
+                        cell.title = '1 CRC = \u20AC' + price.dcrc_eur.toFixed(6) + '\n'
+                            + 'Rate date: ' + rateDate + '\n'
+                            + 'Source: ' + sourceLabel + ' + CoinGecko DAI/EUR';
                     } else if (price && price.dcrc_xdai > 0) {
-                        var crc = parseFloat(formatCrc(amount));
                         var xdai = (crc * price.dcrc_xdai).toFixed(4);
-                        cell.textContent = '$' + xdai;
-                        cell.title = 'xDAI (EUR rate unavailable)';
+                        cell.textContent = '~$' + xdai + ' xDAI';
+                        cell.style.fontSize = '0.8rem';
+                        cell.title = 'EUR rate unavailable \u2014 showing xDAI equivalent\n'
+                            + '1 CRC = $' + price.dcrc_xdai.toFixed(6) + ' xDAI\n'
+                            + 'Rate date: ' + rateDate + '\n'
+                            + 'Source: ' + sourceLabel;
+                    } else {
+                        cell.textContent = '\u2014';
+                        cell.title = 'Price data unavailable for ' + rateDate;
                     }
                 });
             })(eurCell, r[3], r[5]);
