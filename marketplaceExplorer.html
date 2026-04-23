@@ -466,15 +466,24 @@
     // Click-to-show tooltip: wraps content in a .tip-wrap with a fixed .tip-bubble
     function positionBubble(wrap, bubble) {
         var rect = wrap.getBoundingClientRect();
-        var bw = 280;  // approximate bubble width
-        // prefer below, fall back above if near bottom
+        var bh = bubble.offsetHeight || 0;
+        var bw = bubble.offsetWidth || 280;
+        // prefer below, fall back above if near viewport bottom
         var top = rect.bottom + 6;
-        if (top + 120 > window.innerHeight) top = rect.top - 6;  // rough check
+        if (top + bh > window.innerHeight) top = rect.top - bh - 6;
         var left = rect.left + rect.width / 2 - bw / 2;
         if (left < 8) left = 8;
         if (left + bw > window.innerWidth - 8) left = window.innerWidth - bw - 8;
         bubble.style.top = top + 'px';
         bubble.style.left = left + 'px';
+    }
+    function toggleTip(wrap, bubble) {
+        var wasOpen = wrap.classList.contains('tip-open');
+        document.querySelectorAll('.tip-open').forEach(function(o) { o.classList.remove('tip-open'); });
+        if (wasOpen) return;  // was open → just closed, done
+        // open: show first so offsetHeight is measurable, then position
+        wrap.classList.add('tip-open');
+        positionBubble(wrap, bubble);
     }
     function tipWrap(content, tipText) {
         var wrap = el('span', {className: 'tip-wrap'});
@@ -484,9 +493,7 @@
         wrap.appendChild(bubble);
         wrap.addEventListener('click', function(e) {
             e.stopPropagation();
-            document.querySelectorAll('.tip-open').forEach(function(o) { if (o !== wrap) o.classList.remove('tip-open'); });
-            positionBubble(wrap, bubble);
-            wrap.classList.toggle('tip-open');
+            toggleTip(wrap, bubble);
         });
         return wrap;
     }
@@ -1428,9 +1435,7 @@
             eurCell.addEventListener('click', function(e) {
                 if (!eurBubble.textContent) return;
                 e.stopPropagation();
-                document.querySelectorAll('.tip-open').forEach(function(o) { if (o !== eurCell) o.classList.remove('tip-open'); });
-                positionBubble(eurCell, eurBubble);
-                eurCell.classList.toggle('tip-open');
+                toggleTip(eurCell, eurBubble);
             });
             row.appendChild(eurCell);
             (function(label, bubble, cell, amount, timestamp) {
