@@ -271,13 +271,10 @@
         .copy-btn:hover { color: var(--primary); }
 
         /* Click-to-show tooltip (replaces native title for touch support) */
-        .tip-wrap { position: relative; cursor: help; }
+        .tip-wrap { cursor: help; }
         .tip-bubble {
             display: none;
-            position: absolute;
-            bottom: calc(100% + 6px);
-            left: 50%;
-            transform: translateX(-50%);
+            position: fixed;
             background: var(--text);
             color: #fff;
             font-size: 0.75rem;
@@ -287,28 +284,8 @@
             white-space: pre-line;
             min-width: 220px;
             max-width: 320px;
-            z-index: 100;
+            z-index: 1000;
             box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        }
-        .tip-bubble::after {
-            content: '';
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            border: 5px solid transparent;
-            border-top-color: var(--text);
-        }
-        /* In table cells: show below to avoid clipping at top */
-        td.tip-wrap .tip-bubble {
-            bottom: auto;
-            top: calc(100% + 6px);
-        }
-        td.tip-wrap .tip-bubble::after {
-            top: auto;
-            bottom: 100%;
-            border-top-color: transparent;
-            border-bottom-color: var(--text);
         }
         .tip-wrap.tip-open .tip-bubble { display: block; }
 
@@ -486,7 +463,19 @@
         return e;
     }
 
-    // Click-to-show tooltip: wraps content in a .tip-wrap with a .tip-bubble
+    // Click-to-show tooltip: wraps content in a .tip-wrap with a fixed .tip-bubble
+    function positionBubble(wrap, bubble) {
+        var rect = wrap.getBoundingClientRect();
+        var bw = 280;  // approximate bubble width
+        // prefer below, fall back above if near bottom
+        var top = rect.bottom + 6;
+        if (top + 120 > window.innerHeight) top = rect.top - 6;  // rough check
+        var left = rect.left + rect.width / 2 - bw / 2;
+        if (left < 8) left = 8;
+        if (left + bw > window.innerWidth - 8) left = window.innerWidth - bw - 8;
+        bubble.style.top = top + 'px';
+        bubble.style.left = left + 'px';
+    }
     function tipWrap(content, tipText) {
         var wrap = el('span', {className: 'tip-wrap'});
         if (typeof content === 'string') wrap.textContent = content;
@@ -495,16 +484,19 @@
         wrap.appendChild(bubble);
         wrap.addEventListener('click', function(e) {
             e.stopPropagation();
-            // close any other open tooltip first
             document.querySelectorAll('.tip-open').forEach(function(o) { if (o !== wrap) o.classList.remove('tip-open'); });
+            positionBubble(wrap, bubble);
             wrap.classList.toggle('tip-open');
         });
         return wrap;
     }
-    // Close tooltips when clicking outside
+    // Close tooltips when clicking outside or scrolling
     document.addEventListener('click', function() {
         document.querySelectorAll('.tip-open').forEach(function(o) { o.classList.remove('tip-open'); });
     });
+    window.addEventListener('scroll', function() {
+        document.querySelectorAll('.tip-open').forEach(function(o) { o.classList.remove('tip-open'); });
+    }, true);
 
     function truncAddr(a) {
         if (!a) return '';
@@ -1437,6 +1429,7 @@
                 if (!eurBubble.textContent) return;
                 e.stopPropagation();
                 document.querySelectorAll('.tip-open').forEach(function(o) { if (o !== eurCell) o.classList.remove('tip-open'); });
+                positionBubble(eurCell, eurBubble);
                 eurCell.classList.toggle('tip-open');
             });
             row.appendChild(eurCell);
