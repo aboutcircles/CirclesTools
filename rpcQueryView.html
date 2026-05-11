@@ -1427,6 +1427,8 @@
     let lastRequest = null;
     let history = [];
     let batchQueue = [];
+    let tableCatalogByServer = {};
+    let tableCatalogLoading = false;
 
     // Method Registry - all RPC methods with their parameter schemas
     const METHODS = {
@@ -1654,7 +1656,10 @@
                 'CrcV2_DepositInflationary', 'CrcV2_WithdrawInflationary',
                 'CrcV2_DepositDemurraged', 'CrcV2_WithdrawDemurraged',
                 'CrcV2_StreamCompleted', 'CrcV2_DiscountCost', 'CrcV2_GroupMint',
-                'CrcV2_FlowEdgesScopeSingleStarted', 'CrcV2_FlowEdgesScopeLastEnded'
+                'CrcV2_FlowEdgesScopeSingleStarted', 'CrcV2_FlowEdgesScopeLastEnded',
+                'CrcV2_ScoreGroup_GroupInitialized', 'CrcV2_ScoreGroup_MerkleRootUpdated',
+                'CrcV2_ScoreGroup_HistoricalSupply', 'CrcV2_ScoreGroup_PersonalMinted',
+                'CrcV2_ScoreGroup_RouterMinted'
             ]
         },
         circles_query: {
@@ -1896,6 +1901,10 @@
             { name: 'Paginated Avatars Query', method: 'circles_paginated_query', params: { namespace: 'V_Crc', table: 'Avatars', limit: 10 } },
             { name: 'Recent V2 Transfers', method: 'circles_events', params: { eventTypes: ['CrcV2_TransferSingle'] } },
             { name: 'TransferData Events', method: 'circles_events', params: { eventTypes: ['CrcV2_TransferData'] } },
+            { name: 'Score Group Initialized Events', method: 'circles_events', params: { eventTypes: ['CrcV2_ScoreGroup_GroupInitialized'] } },
+            { name: 'Score Group Personal Mints', method: 'circles_events', params: { eventTypes: ['CrcV2_ScoreGroup_PersonalMinted'] } },
+            { name: 'Query Score Group Initialized', method: 'circles_query', params: { namespace: 'CrcV2_ScoreGroup', table: 'GroupInitialized', limit: 50 } },
+            { name: 'Query Score Group Mint Limits', method: 'circles_query', params: { namespace: 'CrcV2_ScoreGroup', table: 'HistoricalSupply', limit: 50 } },
             { name: 'List All Tables', method: 'circles_tables', params: {} }
         ],
         sdk: [
@@ -2086,6 +2095,7 @@
         var server = SERVERS[currentServer];
         document.getElementById('serverUrl').textContent = server.rpc.replace('https://', '').replace(/\/$/, '');
         checkServerStatus();
+        loadTableCatalog(true);
         var paramMethod = urlParams.get('method');
         if (paramMethod && METHODS[paramMethod]) {
             // Find the sidebar item and select it
@@ -2431,6 +2441,7 @@
         var server = SERVERS[currentServer];
         document.getElementById('serverUrl').textContent = server.rpc.replace('https://', '').replace(/\/$/, '');
         checkServerStatus();
+        loadTableCatalog(true);
     }
 
     async function checkServerStatus() {
@@ -2589,20 +2600,14 @@
     function buildQueryBuilderForm() {
         return '<div class="form-group"><label class="form-label">namespace <span class="required">*</span>' +
             '<span class="type-badge">string</span></label>' +
-            '<select class="form-input" id="param-namespace" onchange="updateTableOptions()">' +
-            '<option value="CrcV1">CrcV1</option><option value="CrcV2">CrcV2</option>' +
-            '<option value="V_Crc" selected>V_Crc</option><option value="V_CrcV1">V_CrcV1</option>' +
-            '<option value="V_CrcV2">V_CrcV2</option><option value="V_Safe">V_Safe</option>' +
-            '<option value="Safe">Safe</option><option value="CrcV2_InvitationEscrow">CrcV2_InvitationEscrow</option>' +
-            '<option value="CrcV2_InvitationsAtScale">CrcV2_InvitationsAtScale</option>' +
-            '<option value="CrcV2_PaymentGateway">CrcV2_PaymentGateway</option>' +
-            '<option value="CrcV2_TokenOffers">CrcV2_TokenOffers</option></select></div>' +
+            '<input class="form-input" id="param-namespace" list="namespace-options" value="V_Crc" onchange="updateTableOptions(true)" oninput="updateTableOptions(false)" placeholder="CrcV2_ScoreGroup">' +
+            '<datalist id="namespace-options">' + buildNamespaceOptionsHtml() + '</datalist>' +
+            '<div class="form-hint">Type any namespace from circles_tables, or pick a known namespace.</div></div>' +
             '<div class="form-group"><label class="form-label">table <span class="required">*</span>' +
             '<span class="type-badge">string</span></label>' +
-            '<select class="form-input" id="param-table">' +
-            '<option value="Avatars">Avatars</option><option value="Stats">Stats</option>' +
-            '<option value="Tokens">Tokens</option><option value="Transfers">Transfers</option>' +
-            '<option value="TransferSummary">TransferSummary</option><option value="TrustRelations">TrustRelations</option></select></div>' +
+            '<input class="form-input" id="param-table" list="table-options" value="Avatars" placeholder="GroupInitialized">' +
+            '<datalist id="table-options">' + buildTableOptionsHtml('V_Crc') + '</datalist>' +
+            '<div class="form-hint">Type any table in the selected namespace; suggestions are prefilled for common namespaces.</div></div>' +
             '<div class="form-group"><label class="form-label">limit <span class="type-badge">number</span></label>' +
             '<input type="number" class="form-input" id="param-limit" placeholder="50" value="50"></div>' +
 
@@ -2710,19 +2715,88 @@
         'CrcV2_InvitationsAtScale': ['AccountClaimed', 'AccountCreated', 'AdminSet', 'BotCreated', 'FarmGrown',
             'InvitationModuleUpdated', 'InviterQuotaUpdated', 'InvitesClaimed', 'MaintainerSet', 'RegisterHuman', 'SeederSet'],
         'CrcV2_PaymentGateway': ['GatewayCreated', 'PaymentReceived', 'TrustUpdated'],
+        'CrcV2_ScoreGroup': ['GroupInitialized', 'MerkleRootUpdated', 'HistoricalSupply', 'PersonalMinted', 'RouterMinted'],
         'CrcV2_TokenOffers': ['AccountWeightProviderCreated', 'AccountWeightSet', 'CycleConfiguration',
             'ERC20TokenOfferCreated', 'ExactInputPathComputed', 'ExactInputResult', 'ExactOutputPathComputed',
             'ExactOutputResult', 'MultiTrustNetworkMint', 'OfferDeleted', 'OfferUpdated', 'TokenOfferCreated']
     };
 
-    function updateTableOptions() {
-        var namespace = document.getElementById('param-namespace').value;
-        var tableSelect = document.getElementById('param-table');
-        var tables = NAMESPACE_TABLES[namespace] || ['Avatars'];
+    function getNamespaceTables() {
+        return Object.assign({}, NAMESPACE_TABLES, tableCatalogByServer[currentServer] || {});
+    }
 
-        tableSelect.innerHTML = tables.map(function(t) {
-            return '<option value="' + t + '">' + t + '</option>';
+    function getTablesForNamespace(namespace) {
+        var tablesByNamespace = getNamespaceTables();
+        return tablesByNamespace[namespace] || ['Avatars'];
+    }
+
+    function buildNamespaceOptionsHtml() {
+        return Object.keys(getNamespaceTables()).sort().map(function(namespace) {
+            return '<option value="' + escapeHtml(namespace) + '">';
         }).join('');
+    }
+
+    function buildTableOptionsHtml(namespace) {
+        return getTablesForNamespace(namespace).map(function(table) {
+            return '<option value="' + escapeHtml(table) + '">';
+        }).join('');
+    }
+
+    function updateNamespaceOptions() {
+        var namespaceOptions = document.getElementById('namespace-options');
+        if (namespaceOptions) {
+            namespaceOptions.innerHTML = buildNamespaceOptionsHtml();
+        }
+    }
+
+    async function loadTableCatalog(force) {
+        if (!force && tableCatalogByServer[currentServer]) return;
+        if (tableCatalogLoading) return;
+
+        tableCatalogLoading = true;
+        var serverKey = currentServer;
+        var endpoint = SERVERS[serverKey].rpc;
+        try {
+            var response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'circles_tables', params: [] })
+            });
+            var data = await response.json();
+            var catalog = {};
+            (data.result || []).forEach(function(namespaceEntry) {
+                var namespace = namespaceEntry.namespace || namespaceEntry.Namespace;
+                var tables = namespaceEntry.tables || namespaceEntry.Tables || [];
+                if (!namespace) return;
+
+                catalog[namespace] = Array.from(new Set(tables
+                    .map(function(tableEntry) { return tableEntry.table || tableEntry.Table; })
+                    .filter(Boolean))).sort();
+            });
+            if (Object.keys(catalog).length > 0) {
+                tableCatalogByServer[serverKey] = catalog;
+                if (serverKey === currentServer) {
+                    updateNamespaceOptions();
+                    updateTableOptions(false);
+                }
+            }
+        } catch (error) {
+            console.warn('Could not load circles_tables catalog:', error);
+        } finally {
+            tableCatalogLoading = false;
+        }
+    }
+
+    function updateTableOptions(resetUnknownTable) {
+        var namespace = document.getElementById('param-namespace').value;
+        var tableInput = document.getElementById('param-table');
+        var tableOptions = document.getElementById('table-options');
+        var tables = getTablesForNamespace(namespace);
+
+        tableOptions.innerHTML = buildTableOptionsHtml(namespace);
+        if ((resetUnknownTable || !tableInput.value) && !tables.includes(tableInput.value)) {
+            tableInput.value = tables[0] || '';
+        }
     }
 
     function buildEventTypesSelector(eventTypes) {
