@@ -1428,7 +1428,7 @@
     let history = [];
     let batchQueue = [];
     let tableCatalogByServer = {};
-    let tableCatalogLoading = false;
+    let tableCatalogLoadingByServer = {};
 
     // Method Registry - all RPC methods with their parameter schemas
     const METHODS = {
@@ -2750,18 +2750,25 @@
     }
 
     async function loadTableCatalog(force) {
-        if (!force && tableCatalogByServer[currentServer]) return;
-        if (tableCatalogLoading) return;
-
-        tableCatalogLoading = true;
         var serverKey = currentServer;
+        if (!force && tableCatalogByServer[serverKey]) return;
+        if (tableCatalogLoadingByServer[serverKey]) return;
+
+        tableCatalogLoadingByServer[serverKey] = true;
         var endpoint = SERVERS[serverKey].rpc;
+        var controller = new AbortController();
+        var timeoutId = setTimeout(function() {
+            controller.abort();
+        }, 8000);
+
         try {
             var response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                signal: controller.signal,
                 body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'circles_tables', params: [] })
             });
+            clearTimeout(timeoutId);
             var data = await response.json();
             var catalog = {};
             (data.result || []).forEach(function(namespaceEntry) {
@@ -2781,16 +2788,24 @@
                 }
             }
         } catch (error) {
-            console.warn('Could not load circles_tables catalog:', error);
+            if (error.name === 'AbortError') {
+                console.warn('Timed out loading circles_tables catalog for server:', serverKey);
+            } else {
+                console.warn('Could not load circles_tables catalog for server:', serverKey, error);
+            }
         } finally {
-            tableCatalogLoading = false;
+            clearTimeout(timeoutId);
+            tableCatalogLoadingByServer[serverKey] = false;
         }
     }
 
     function updateTableOptions(resetUnknownTable) {
-        var namespace = document.getElementById('param-namespace').value;
+        var namespaceInput = document.getElementById('param-namespace');
         var tableInput = document.getElementById('param-table');
         var tableOptions = document.getElementById('table-options');
+        if (!namespaceInput || !tableInput || !tableOptions) return;
+
+        var namespace = namespaceInput.value;
         var tables = getTablesForNamespace(namespace);
 
         tableOptions.innerHTML = buildTableOptionsHtml(namespace);
