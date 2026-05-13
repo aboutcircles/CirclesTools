@@ -1583,6 +1583,14 @@
                 { name: 'cursor', type: 'string', required: false, description: 'Pagination cursor' }
             ]
         },
+        circles_getScoreGroupMintLimits: {
+            category: 'trust',
+            description: 'Per-(group, collateral) headroom for score-group mints; optional collateralToken filter returns a single row',
+            params: [
+                { name: 'group', type: 'address', required: true, description: 'Score-group address' },
+                { name: 'collateralToken', type: 'address', required: false, description: 'Optional collateral token filter' }
+            ]
+        },
         circles_getNetworkSnapshot: {
             category: 'trust',
             description: 'Get a complete snapshot of the Circles trust network',
@@ -1888,7 +1896,9 @@
         trust: [
             { name: 'Get Trust Relations', method: 'circles_getTrustRelations', params: { address: '' } },
             { name: 'Find All Groups', method: 'circles_findGroups', params: { limit: 50 } },
-            { name: 'Get Group Members', method: 'circles_getGroupMembers', params: { groupAddress: '' } }
+            { name: 'Get Group Members', method: 'circles_getGroupMembers', params: { groupAddress: '' } },
+            { name: 'Score Group Mint Limits (all collateral)', method: 'circles_getScoreGroupMintLimits', params: { group: '' } },
+            { name: 'Score Group Mint Limits (single collateral)', method: 'circles_getScoreGroupMintLimits', params: { group: '', collateralToken: '' } }
         ],
         tx: [
             { name: 'Recent Transactions', method: 'circles_getTransactionHistory', params: { avatarAddress: '', limit: 20 } },
