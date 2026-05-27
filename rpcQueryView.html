@@ -1894,8 +1894,8 @@
             { name: 'Get Avatar Info', method: 'circles_getAvatarInfo', params: { address: '' } },
             { name: 'Get Full Profile', method: 'circles_getProfileByAddress', params: { address: '' } },
             { name: 'Search Profiles', method: 'circles_searchProfiles', params: { text: 'circles', limit: 20 } },
-            { name: 'Search Open Groups', method: 'circles_searchProfiles', params: { text: '', groupType: 'open', limit: 20 } },
-            { name: 'Search Closed Groups', method: 'circles_searchProfiles', params: { text: '', groupType: 'closed', limit: 20 } }
+            { name: 'Search Open Groups', method: 'circles_searchProfiles', params: { text: 'group', groupType: 'open', limit: 20 } },
+            { name: 'Search Closed Groups', method: 'circles_searchProfiles', params: { text: 'group', groupType: 'closed', limit: 20 } }
         ],
         trust: [
             { name: 'Get Trust Relations', method: 'circles_getTrustRelations', params: { address: '' } },
