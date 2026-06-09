@@ -1908,12 +1908,12 @@
             { name: 'gCRC Affiliate Members (hourly)', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'AffiliateMembersCount_1h', filter: [{ Type: 'FilterPredicate', Column: 'group', FilterType: 'Equals', Value: '0x93ed5a96347927ff6ff6b790f8cf5258240c321f' }], order: [{ Column: 'timestamp', SortOrder: 'DESC' }], limit: 48 } },
             { name: 'Affiliate Members (any group, daily)', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'AffiliateMembersCount_1d', filter: [{ Type: 'FilterPredicate', Column: 'group', FilterType: 'Equals', Value: '' }], order: [{ Column: 'timestamp', SortOrder: 'DESC' }], limit: 30 } },
             { name: 'Raw Affiliate Group Changes', method: 'circles_query', params: { namespace: 'CrcV2', table: 'AffiliateGroupChanged', filter: [{ Type: 'FilterPredicate', Column: 'newGroup', FilterType: 'Equals', Value: '0x93ed5a96347927ff6ff6b790f8cf5258240c321f' }], order: [{ Column: 'blockNumber', SortOrder: 'DESC' }], limit: 50 } },
-            { name: 'Group Collateral by Token', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'GroupCollateralByToken', filter: [{ Type: 'FilterPredicate', Column: 'group', FilterType: 'Equals', Value: '' }], limit: 50 } },
+            { name: 'Group Collateral by Token', hint: 'Returns 0 rows if the group has not yet received any collateral deposits.', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'GroupCollateralByToken', filter: [{ Type: 'FilterPredicate', Column: 'group', FilterType: 'Equals', Value: '' }], limit: 50 } },
             { name: 'Group Mint/Redeem Activity (daily)', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'GroupMintRedeem_1d', filter: [{ Type: 'FilterPredicate', Column: 'group', FilterType: 'Equals', Value: '' }], order: [{ Column: 'timestamp', SortOrder: 'DESC' }], limit: 30 } },
             { name: 'Group Token Supply', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'GroupTokenSupply', filter: [{ Type: 'FilterPredicate', Column: 'group', FilterType: 'Equals', Value: '' }], limit: 10 } },
             { name: 'Group Collateral Diff by Token', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'GroupCollateralDiffByToken', filter: [{ Type: 'FilterPredicate', Column: 'group', FilterType: 'Equals', Value: '' }], order: [{ Column: 'timestamp', SortOrder: 'DESC' }], limit: 50 } },
-            { name: 'Vault Balances by Token (current)', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'GroupVaultBalancesByToken', filter: [{ Type: 'FilterPredicate', Column: 'vault', FilterType: 'Equals', Value: '' }], limit: 50 } },
-            { name: 'Balancer Vault Balance (daily)', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'Erc20BalancerVaultBalance_1d', filter: [{ Type: 'FilterPredicate', Column: 'tokenAddress', FilterType: 'Equals', Value: '' }], order: [{ Column: 'timestamp', SortOrder: 'DESC' }], limit: 30 } },
+            { name: 'Vault Balances by Token (current)', hint: 'Filter by vault address (treasury contract). Returns 0 rows if no tokens are held. Use circles_getScoreGroupMintLimits for a summary view.', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'GroupVaultBalancesByToken', filter: [{ Type: 'FilterPredicate', Column: 'vault', FilterType: 'Equals', Value: '' }], limit: 50 } },
+            { name: 'Balancer Vault Balance (daily)', hint: 'Filter by tokenAddress (ERC20). Returns 0 rows if the token has never been deposited into a Balancer vault.', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'Erc20BalancerVaultBalance_1d', filter: [{ Type: 'FilterPredicate', Column: 'tokenAddress', FilterType: 'Equals', Value: '' }], order: [{ Column: 'timestamp', SortOrder: 'DESC' }], limit: 30 } },
             { name: 'Receive Count (who can receive)', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'ReceiveCount', order: [{ Column: 'receive_count', SortOrder: 'DESC' }], limit: 50 } }
         ],
         tx: [
@@ -2527,7 +2527,8 @@
 
         // Build header
         var presetOptions = (PRESETS[config.category] || []).map(function(p, i) {
-            return '<option value="' + i + '">' + escapeHtml(p.name) + '</option>';
+            var title = p.hint ? ' title="' + escapeHtml(p.hint) + '"' : '';
+            return '<option value="' + i + '"' + title + '>' + escapeHtml(p.name) + '</option>';
         }).join('');
 
         var serverNote = config.serverNote
