@@ -1900,9 +1900,21 @@
         trust: [
             { name: 'Get Trust Relations', method: 'circles_getTrustRelations', params: { address: '' } },
             { name: 'Find All Groups', method: 'circles_findGroups', params: { limit: 50 } },
+            { name: 'All Groups with Member Count', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'Groups', order: [{ Column: 'memberCount', SortOrder: 'DESC' }], limit: 50 } },
             { name: 'Get Group Members', method: 'circles_getGroupMembers', params: { groupAddress: '' } },
             { name: 'Score Group Mint Limits (all collateral)', method: 'circles_getScoreGroupMintLimits', params: { group: '' } },
-            { name: 'Score Group Mint Limits (single collateral)', method: 'circles_getScoreGroupMintLimits', params: { group: '', collateralToken: '' } }
+            { name: 'Score Group Mint Limits (single collateral)', method: 'circles_getScoreGroupMintLimits', params: { group: '', collateralToken: '' } },
+            { name: 'gCRC Affiliate Members (daily)', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'AffiliateMembersCount_1d', filter: [{ Type: 'FilterPredicate', Column: 'group', FilterType: 'Equals', Value: '0x93ed5a96347927ff6ff6b790f8cf5258240c321f' }], order: [{ Column: 'timestamp', SortOrder: 'DESC' }], limit: 30 } },
+            { name: 'gCRC Affiliate Members (hourly)', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'AffiliateMembersCount_1h', filter: [{ Type: 'FilterPredicate', Column: 'group', FilterType: 'Equals', Value: '0x93ed5a96347927ff6ff6b790f8cf5258240c321f' }], order: [{ Column: 'timestamp', SortOrder: 'DESC' }], limit: 48 } },
+            { name: 'Affiliate Members (any group, daily)', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'AffiliateMembersCount_1d', filter: [{ Type: 'FilterPredicate', Column: 'group', FilterType: 'Equals', Value: '' }], order: [{ Column: 'timestamp', SortOrder: 'DESC' }], limit: 30 } },
+            { name: 'Raw Affiliate Group Changes', method: 'circles_query', params: { namespace: 'CrcV2', table: 'AffiliateGroupChanged', filter: [{ Type: 'FilterPredicate', Column: 'newGroup', FilterType: 'Equals', Value: '0x93ed5a96347927ff6ff6b790f8cf5258240c321f' }], order: [{ Column: 'blockNumber', SortOrder: 'DESC' }], limit: 50 } },
+            { name: 'Group Collateral by Token', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'GroupCollateralByToken', filter: [{ Type: 'FilterPredicate', Column: 'group', FilterType: 'Equals', Value: '' }], limit: 50 } },
+            { name: 'Group Mint/Redeem Activity (daily)', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'GroupMintRedeem_1d', filter: [{ Type: 'FilterPredicate', Column: 'group', FilterType: 'Equals', Value: '' }], order: [{ Column: 'timestamp', SortOrder: 'DESC' }], limit: 30 } },
+            { name: 'Group Token Supply', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'GroupTokenSupply', filter: [{ Type: 'FilterPredicate', Column: 'group', FilterType: 'Equals', Value: '' }], limit: 10 } },
+            { name: 'Group Collateral Diff by Token', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'GroupCollateralDiffByToken', filter: [{ Type: 'FilterPredicate', Column: 'group', FilterType: 'Equals', Value: '' }], order: [{ Column: 'blockNumber', SortOrder: 'DESC' }], limit: 50 } },
+            { name: 'Vault Balances by Token (current)', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'GroupVaultBalancesByToken', filter: [{ Type: 'FilterPredicate', Column: 'vault', FilterType: 'Equals', Value: '' }], limit: 50 } },
+            { name: 'Balancer Vault Balance (daily)', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'Erc20BalancerVaultBalance_1d', filter: [{ Type: 'FilterPredicate', Column: 'tokenAddress', FilterType: 'Equals', Value: '' }], order: [{ Column: 'timestamp', SortOrder: 'DESC' }], limit: 30 } },
+            { name: 'Receive Count (who can receive)', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'ReceiveCount', order: [{ Column: 'receive_count', SortOrder: 'DESC' }], limit: 50 } }
         ],
         tx: [
             { name: 'Recent Transactions', method: 'circles_getTransactionHistory', params: { avatarAddress: '', limit: 20 } },
@@ -1911,10 +1923,16 @@
             { name: 'Transfer Data (pair)', method: 'circles_getTransferData', params: { address: '', counterparty: '', limit: 20 } }
         ],
         query: [
+            { name: 'Network Stats', method: 'circles_query', params: { namespace: 'V_Crc', table: 'Stats', limit: 1 } },
             { name: 'Query Avatars Table', method: 'circles_query', params: { namespace: 'V_Crc', table: 'Avatars', limit: 50 } },
             { name: 'Paginated Avatars Query', method: 'circles_paginated_query', params: { namespace: 'V_Crc', table: 'Avatars', limit: 10 } },
             { name: 'Recent V2 Transfers', method: 'circles_events', params: { eventTypes: ['CrcV2_TransferSingle'] } },
             { name: 'TransferData Events', method: 'circles_events', params: { eventTypes: ['CrcV2_TransferData'] } },
+            { name: 'V2 Total Supply', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'TotalSupply', limit: 10 } },
+            { name: 'Group Wrap/Unwrap Activity (daily)', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'GroupWrapUnWrap_1d', filter: [{ Type: 'FilterPredicate', Column: 'group', FilterType: 'Equals', Value: '' }], order: [{ Column: 'timestamp', SortOrder: 'DESC' }], limit: 30 } },
+            { name: 'Group Member Count Over Time (daily)', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'GroupMembersCount_1d', filter: [{ Type: 'FilterPredicate', Column: 'group', FilterType: 'Equals', Value: '' }], order: [{ Column: 'timestamp', SortOrder: 'DESC' }], limit: 30 } },
+            { name: 'Group Token Holders & Balances', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'GroupTokenHoldersBalance', filter: [{ Type: 'FilterPredicate', Column: 'group', FilterType: 'Equals', Value: '' }], limit: 50 } },
+            { name: 'Vault Balances by Token (hourly)', method: 'circles_query', params: { namespace: 'V_CrcV2', table: 'GroupVaultBalancesByToken_1h', filter: [{ Type: 'FilterPredicate', Column: 'group', FilterType: 'Equals', Value: '' }], order: [{ Column: 'timestamp', SortOrder: 'DESC' }], limit: 24 } },
             { name: 'Score Group Initialized Events (policy)', method: 'circles_events', params: { eventTypes: ['CrcV2_ScoreGroup_GroupInitialized'] } },
             { name: 'Score Group Contract Initialized Events', method: 'circles_events', params: { eventTypes: ['CrcV2_ScoreGroup_ScoreGroupInitialized'] } },
             { name: 'Score Group OptOut Status Changes', method: 'circles_events', params: { eventTypes: ['CrcV2_ScoreGroup_OptOutStatusChanged'] } },
