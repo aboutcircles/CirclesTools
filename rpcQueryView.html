@@ -1584,6 +1584,50 @@
                 { name: 'cursor', type: 'string', required: false, description: 'Pagination cursor' }
             ]
         },
+        circles_getAffiliateGroupWishlist: {
+            category: 'trust',
+            description: 'Multi-affiliate communities: the groups an avatar has signalled on-chain intent to join (the wishlist), each with its membershipFee (percent of daily gCRC mint, or null), plus the summed totalFeePercentage.',
+            serverNote: 'Only available on Staging',
+            params: [
+                { name: 'avatar', type: 'address', required: true, description: 'Avatar address' }
+            ]
+        },
+        circles_getAffiliateGroups: {
+            category: 'trust',
+            description: 'Confirmed-membership subset of an avatar\'s affiliate wishlist: only groups that currently trust the avatar on-chain (the bilateral handshake; reflects TMS delay). totalFeePercentage is summed over this subset.',
+            serverNote: 'Only available on Staging',
+            params: [
+                { name: 'avatar', type: 'address', required: true, description: 'Avatar address' }
+            ]
+        },
+        circles_getAffiliateGroupFeesPercentage: {
+            category: 'trust',
+            description: 'An avatar\'s total committed membership-fee percentage across its affiliate wishlist. Used to block joins that would exceed the 100% cap.',
+            serverNote: 'Only available on Staging',
+            params: [
+                { name: 'avatar', type: 'address', required: true, description: 'Avatar address' }
+            ]
+        },
+        circles_getAffiliateGroupMembersWishlist: {
+            category: 'trust',
+            description: 'Multi-affiliate communities: the avatars that have signalled intent to join a group (the group\'s members wishlist). Paginated. This is the set the TMS reconciles trust against.',
+            serverNote: 'Only available on Staging',
+            params: [
+                { name: 'groupAddress', type: 'address', required: true, description: 'Group address' },
+                { name: 'limit', type: 'number', required: false, default: 100, description: 'Max results (1-1000)' },
+                { name: 'cursor', type: 'string', required: false, description: 'Pagination cursor' }
+            ]
+        },
+        circles_getAffiliateGroupMembers: {
+            category: 'trust',
+            description: 'Confirmed-membership subset of a group\'s affiliate wishlist: only avatars the group actually trusts on-chain (reflects TMS delay). Paginated.',
+            serverNote: 'Only available on Staging',
+            params: [
+                { name: 'groupAddress', type: 'address', required: true, description: 'Group address' },
+                { name: 'limit', type: 'number', required: false, default: 100, description: 'Max results (1-1000)' },
+                { name: 'cursor', type: 'string', required: false, description: 'Pagination cursor' }
+            ]
+        },
         circles_getScoreGroupMintLimits: {
             category: 'trust',
             description: 'Per-(group, collateral) headroom for score-group mints; optional collateralToken filter returns a single row',
